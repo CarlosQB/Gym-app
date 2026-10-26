@@ -66,24 +66,26 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
 
   const supabase = await createClient();
 
-  const { count } = await supabase
-    .from("sets")
-    .select("id", { count: "exact", head: true })
-    .eq("workout_id", input.workoutId)
-    .eq("exercise_id", input.exerciseId);
-
-  let isPr = false;
-  if (input.kind === "normal") {
-    const { data: prev } = await supabase
+  // Las dos consultas son independientes: se piden a la vez.
+  const [{ count }, prevRes] = await Promise.all([
+    supabase
       .from("sets")
-      .select("weight_kg")
-      .eq("exercise_id", input.exerciseId)
-      .eq("kind", "normal")
-      .order("weight_kg", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    isPr = !!prev && input.weightKg > Number(prev.weight_kg);
-  }
+      .select("id", { count: "exact", head: true })
+      .eq("workout_id", input.workoutId)
+      .eq("exercise_id", input.exerciseId),
+    input.kind === "normal"
+      ? supabase
+          .from("sets")
+          .select("weight_kg")
+          .eq("exercise_id", input.exerciseId)
+          .eq("kind", "normal")
+          .order("weight_kg", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const prev = prevRes.data;
+  const isPr = input.kind === "normal" && !!prev && input.weightKg > Number(prev.weight_kg);
 
   const { error } = await supabase.from("sets").insert({
     workout_id: input.workoutId,

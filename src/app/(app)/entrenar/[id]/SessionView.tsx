@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { deleteSet, finishWorkout, saveSet } from "@/app/actions";
 import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
@@ -87,8 +87,14 @@ function Stepper(props: {
   );
 }
 
-export function SessionView({ workout, items, sets, lastBest }: Props) {
+type SetAction = { type: "add"; set: SetRow } | { type: "del"; id: string };
+
+export function SessionView({ workout, items, sets: serverSets, lastBest }: Props) {
   const [pending, startTransition] = useTransition();
+  // Las series se ven al instante; el servidor confirma en segundo plano.
+  const [sets, applyOptimistic] = useOptimistic(serverSets, (cur: SetRow[], a: SetAction) =>
+    a.type === "add" ? [...cur, a.set] : cur.filter((s) => s.id !== a.id),
+  );
   const slots = useMemo(() => groupSlots(items), [items]);
   // Cuál ejercicio de cada bloque está activo (0 = primero, 1 = el que sigue…).
   const [sub, setSub] = useState<Record<string, number>>({});
@@ -223,31 +229,21 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
       return;
     }
     setError(null);
+
+    const exerciseId = active!.id;
+    const kind = warmup ? "warmup" : "normal";
+    const wasWarmup = warmup;
+    const rest = active!.re.rest_seconds;
+
     startTransition(async () => {
-      const res = await saveSet({
-        workoutId: workout.id,
-        exerciseId: active!.id,
-        kind: warmup ? "warmup" : "normal",
-        weightKg: w,
-        reps: r,
-        rir: warmup ? null : rir,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "No se pudo guardar.");
-        return;
-      }
-      if (res.isPr) {
-        setPrFlash(true);
-        setTimeout(() => setPrFlash(false), 4000);
-      }
-      if (!warmup) {
-        const total = active!.re.rest_seconds;
-        setRestTotal(total);
-        setRestEnd(Date.now() + total * 1000);
+      // Todo lo visible ocurre al instante, sin esperar al servidor.
+      if (!wasWarmup) {
+        setRestTotal(rest);
+        setRestEnd(Date.now() + rest * 1000);
         setNow(Date.now());
       }
       setWarmup(false);
-      if (!warmup && members.length > 1) {
+      if (!wasWarmup && members.length > 1) {
         // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
         for (let k = 1; k < members.length; k++) {
           const j = (activeSub + k) % members.length;
@@ -259,12 +255,46 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
           }
         }
       }
+
+      applyOptimistic({
+        type: "add",
+        set: {
+          id: `tmp-${Date.now()}`,
+          workout_id: workout.id,
+          exercise_id: exerciseId,
+          set_number: nextNumber,
+          kind,
+          weight_kg: w,
+          reps: r,
+          rir: wasWarmup ? null : rir,
+          is_pr: false,
+          created_at: new Date().toISOString(),
+        },
+      });
+      const res = await saveSet({
+        workoutId: workout.id,
+        exerciseId,
+        kind,
+        weightKg: w,
+        reps: r,
+        rir: wasWarmup ? null : rir,
+      });
+      if (!res.ok) {
+        setError(res.error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
+        setRestEnd(null);
+        return;
+      }
+      if (res.isPr) {
+        setPrFlash(true);
+        setTimeout(() => setPrFlash(false), 4000);
+      }
     });
   }
 
   function onDelete(id: string) {
     if (!window.confirm("¿Borrar esta serie?")) return;
     startTransition(async () => {
+      applyOptimistic({ type: "del", id });
       await deleteSet(id, workout.id);
     });
   }

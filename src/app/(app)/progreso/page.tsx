@@ -7,7 +7,7 @@ const TARGET_MIN = 10;
 const TARGET_MAX = 16;
 
 type MuscleRow = { week_start: string; muscle_group: string; effective_sets: number };
-type ExerciseRow = { exercise_id: string; exercises: { name: string; muscle_group: string } | null };
+type ExerciseRow = { id: string; name: string; muscle_group: string; sets: { count: number }[] };
 type PrRow = {
   weight_kg: number;
   reps: number;
@@ -24,7 +24,7 @@ export default async function ProgresoPage() {
 
   const [muscleRes, exRes, prRes] = await Promise.all([
     supabase.from("weekly_muscle_sets").select("week_start, muscle_group, effective_sets").gte("week_start", lastWeek),
-    supabase.from("sets").select("exercise_id, exercises(name, muscle_group)").eq("kind", "normal").limit(3000),
+    supabase.from("exercises").select("id, name, muscle_group, sets(count)"),
     supabase
       .from("sets")
       .select("weight_kg, reps, created_at, exercise_id, exercise:exercises(name)")
@@ -37,13 +37,10 @@ export default async function ProgresoPage() {
   const current = muscle.filter((m) => m.week_start === thisWeek).sort((a, b) => b.effective_sets - a.effective_sets);
   const prevMap = new Map(muscle.filter((m) => m.week_start === lastWeek).map((m) => [m.muscle_group, m.effective_sets]));
 
-  const seen = new Map<string, { name: string; group: string }>();
-  for (const r of (exRes.data ?? []) as unknown as ExerciseRow[]) {
-    if (!seen.has(r.exercise_id) && r.exercises) {
-      seen.set(r.exercise_id, { name: r.exercises.name, group: r.exercises.muscle_group });
-    }
-  }
-  const exercises = [...seen.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name, "es"));
+  const exercises = ((exRes.data ?? []) as ExerciseRow[])
+    .filter((e) => (e.sets?.[0]?.count ?? 0) > 0)
+    .map((e) => [e.id, { name: e.name, group: e.muscle_group }] as const)
+    .sort((a, b) => a[1].name.localeCompare(b[1].name, "es"));
   const prs = (prRes.data ?? []) as unknown as PrRow[];
 
   return (

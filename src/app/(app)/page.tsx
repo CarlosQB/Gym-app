@@ -23,7 +23,7 @@ export default async function HoyPage() {
 
   const since = new Date(now.getTime() - 100 * 24 * 3600 * 1000).toISOString();
 
-  const [routinesRes, workoutsRes, lastRes] = await Promise.all([
+  const [routinesRes, workoutsRes, lastRes, itemsRes] = await Promise.all([
     supabase.from("routines").select("*").order("position"),
     supabase
       .from("workouts")
@@ -37,6 +37,10 @@ export default async function HoyPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("routine_exercises")
+      .select("*, exercise:exercises!exercise_id(*)")
+      .order("position"),
   ]);
 
   const routines = (routinesRes.data ?? []) as Routine[];
@@ -47,15 +51,9 @@ export default async function HoyPage() {
   const todayRoutine =
     routines.find((r) => r.weekday === todayWeekday) ?? routines[0] ?? null;
 
-  let exercises: RoutineExercise[] = [];
-  if (todayRoutine) {
-    const { data } = await supabase
-      .from("routine_exercises")
-      .select("*, exercise:exercises!exercise_id(*)")
-      .eq("routine_id", todayRoutine.id)
-      .order("position");
-    exercises = (data ?? []) as RoutineExercise[];
-  }
+  const exercises = ((itemsRes.data ?? []) as RoutineExercise[]).filter(
+    (re) => re.routine_id === todayRoutine?.id,
+  );
 
   const monday = weekStart(now);
   const week = DAY_LETTERS.map((letter, i) => {
