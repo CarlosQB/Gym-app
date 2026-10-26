@@ -130,7 +130,7 @@ export default async function HoyPage() {
             {todayRoutine.name}
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            {exercises.length} ejercicios
+            {exercises.reduce((n, re) => n + (re.alt_exercise_id ? 2 : 1), 0)} ejercicios
           </p>
 
           <ul className="mt-3">

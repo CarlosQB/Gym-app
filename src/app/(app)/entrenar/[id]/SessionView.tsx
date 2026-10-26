@@ -156,6 +156,13 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
     setError(null);
   }
 
+  // Los alternos cuentan como ejercicios aparte: 6 ejercicios aunque haya 4 lugares.
+  const sizes = items.map((it) => (it.alt_exercise_id ? 2 : 1));
+  const totalExercises = sizes.reduce((a, b) => a + b, 0);
+  const firstNumber = 1 + sizes.slice(0, index).reduce((a, b) => a + b, 0);
+  const numberLabel =
+    sizes[index] === 2 ? `${firstNumber} · ${firstNumber + 1}` : String(firstNumber);
+
   // Reloj de la sesión
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -267,7 +274,7 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
       <div>
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold tracking-[0.08em] text-accent">
-            EJERCICIO {index + 1} DE {items.length}
+            EJERCICIO {numberLabel} DE {totalExercises}
           </p>
           <div className="flex">
             <button
