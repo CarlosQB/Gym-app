@@ -160,10 +160,8 @@ export type RoutineItemInput = {
   rirMin: number;
   rirMax: number;
   restSeconds: number;
-  altExerciseId: string | null;
-  altNewName: string;
-  altMuscleGroup: string;
-  alternate: boolean;
+  /** true = va en el mismo bloque que el ejercicio anterior */
+  withPrevious: boolean;
 };
 
 export type RoutineInput = {
@@ -188,9 +186,6 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
     const n = i + 1;
     if (!it.exerciseId && !it.newName.trim()) {
       return { ok: false, error: `Ejercicio ${n}: elige uno o escribe el nombre` };
-    }
-    if (it.altExerciseId && it.altExerciseId === it.exerciseId) {
-      return { ok: false, error: `Ejercicio ${n}: el alterno debe ser distinto` };
     }
     if (
       !inRange(it.targetSets, 1, 20) ||
@@ -253,20 +248,10 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
   }
 
   const exerciseIds: string[] = [];
-  const altIds: (string | null)[] = [];
   for (const it of input.items) {
     const main = await resolveExercise(it.exerciseId, it.newName, it.muscleGroup);
     if ("error" in main) return { ok: false, error: main.error };
     exerciseIds.push(main.id);
-
-    if (it.altExerciseId || it.altNewName.trim()) {
-      const alt = await resolveExercise(it.altExerciseId, it.altNewName, it.altMuscleGroup);
-      if ("error" in alt) return { ok: false, error: alt.error };
-      if (alt.id === main.id) return { ok: false, error: "El alterno debe ser distinto al principal" };
-      altIds.push(alt.id);
-    } else {
-      altIds.push(null);
-    }
   }
 
   // 3. Se insertan las filas nuevas y después se borran las anteriores (no se pierde nada si falla).
@@ -286,8 +271,7 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
       rir_min: it.rirMin,
       rir_max: it.rirMax,
       rest_seconds: it.restSeconds,
-      alt_exercise_id: altIds[i],
-      alternate: altIds[i] ? it.alternate : false,
+      with_previous: i > 0 && it.withPrevious,
     })),
   );
   if (insErr) return { ok: false, error: insErr.message };

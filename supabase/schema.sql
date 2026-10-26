@@ -38,7 +38,9 @@ create table if not exists public.routine_exercises (
   rir_min smallint not null default 1,
   rir_max smallint not null default 2,
   rest_seconds smallint not null default 120,
-  -- Ejercicio alterno (ver migrations/002); si alternate = true se turnan cada sesión
+  -- true = va en el mismo bloque que el ejercicio anterior, uno después del otro (ver migrations/003)
+  with_previous boolean not null default false,
+  -- sin uso desde la migración 003 (antes: ejercicio alterno)
   alt_exercise_id uuid references public.exercises(id) on delete set null,
   alternate boolean not null default false
 );

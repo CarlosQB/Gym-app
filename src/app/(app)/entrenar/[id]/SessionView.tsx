@@ -12,13 +12,14 @@ type Props = {
   lastBest: Record<string, LastBest>;
 };
 
-// Ejercicios de un lugar de la rutina: uno solo, o dos que se hacen uno después del otro.
-function membersOf(it: RoutineExercise) {
-  const list = [{ id: it.exercise_id, ex: it.exercise }];
-  if (it.alt_exercise && it.alt_exercise_id) {
-    list.push({ id: it.alt_exercise_id, ex: it.alt_exercise });
+// Agrupa los ejercicios: los marcados "va después del anterior" se hacen en el mismo bloque.
+function groupSlots(items: RoutineExercise[]) {
+  const slots: RoutineExercise[][] = [];
+  for (const it of items) {
+    if (it.with_previous && slots.length > 0) slots[slots.length - 1].push(it);
+    else slots.push([it]);
   }
-  return list;
+  return slots;
 }
 
 function fmt(n: number) {
@@ -88,30 +89,30 @@ function Stepper(props: {
 
 export function SessionView({ workout, items, sets, lastBest }: Props) {
   const [pending, startTransition] = useTransition();
-  // Cuál de los dos ejercicios de un lugar está activo (0 = primero, 1 = después).
+  const slots = useMemo(() => groupSlots(items), [items]);
+  // Cuál ejercicio de cada bloque está activo (0 = primero, 1 = el que sigue…).
   const [sub, setSub] = useState<Record<string, number>>({});
 
   // Ejercicio inicial: el primero que aún no completa sus series objetivo.
   const initialIndex = useMemo(() => {
-    const i = items.findIndex(
-      (it) =>
-        sets.filter(
-          (s) =>
-            (s.exercise_id === it.exercise_id || s.exercise_id === it.alt_exercise_id) &&
-            s.kind !== "warmup",
-        ).length <
-        it.target_sets,
+    const i = slots.findIndex((slot) =>
+      slot.some(
+        (re) =>
+          sets.filter((s) => s.exercise_id === re.exercise_id && s.kind !== "warmup").length <
+          re.target_sets,
+      ),
     );
-    return i === -1 ? Math.max(0, items.length - 1) : i;
+    return i === -1 ? Math.max(0, slots.length - 1) : i;
     // solo al montar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Valores más útiles para precargar al entrar a un ejercicio.
   function defaultsFor(i: number, subIdx = 0) {
-    const it = items[i];
-    if (!it) return { weight: "20", reps: "10", rir: null as number | null };
-    const id = (membersOf(it)[subIdx] ?? membersOf(it)[0]).id;
+    const slot = slots[i];
+    if (!slot) return { weight: "20", reps: "10", rir: null as number | null };
+    const it = slot[subIdx] ?? slot[0];
+    const id = it.exercise_id;
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
@@ -130,12 +131,12 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [prFlash, setPrFlash] = useState(false);
 
-  const item = items[index];
-  const members = item ? membersOf(item) : [];
-  const activeSub = item ? Math.min(sub[item.id] ?? 0, members.length - 1) : 0;
-  const active = item ? members[activeSub] : null;
+  const slot = slots[index];
+  const members = (slot ?? []).map((re) => ({ id: re.exercise_id, ex: re.exercise, re }));
+  const activeSub = slot ? Math.min(sub[String(index)] ?? 0, members.length - 1) : 0;
+  const active = slot ? members[activeSub] : null;
+  const item = active?.re;
   const exSets = active ? sets.filter((s) => s.exercise_id === active.id) : [];
-  const workingSets = exSets.filter((s) => s.kind !== "warmup");
 
   function goTo(i: number) {
     const d = defaultsFor(i, 0);
@@ -148,8 +149,8 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
   }
 
   function selectSub(n: number) {
-    if (!item) return;
-    setSub((m) => ({ ...m, [item.id]: n }));
+    if (!slot) return;
+    setSub((m) => ({ ...m, [String(index)]: n }));
     const d = defaultsFor(index, n);
     setWeight(d.weight);
     setReps(d.reps);
@@ -158,16 +159,19 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
     setError(null);
   }
 
-  // Los alternos cuentan como ejercicios aparte: 6 ejercicios aunque haya 4 lugares.
-  const sizes = items.map((it) => (it.alt_exercise_id ? 2 : 1));
+  // Numeración corrida: cada ejercicio cuenta como uno aunque compartan bloque.
+  const sizes = slots.map((sl) => sl.length);
   const totalExercises = sizes.reduce((a, b) => a + b, 0);
   const firstNumber = 1 + sizes.slice(0, index).reduce((a, b) => a + b, 0);
   const numberLabel =
-    sizes[index] === 2 ? `${firstNumber} · ${firstNumber + 1}` : String(firstNumber);
+    (sizes[index] ?? 1) > 1
+      ? `${firstNumber}–${firstNumber + sizes[index] - 1}`
+      : String(firstNumber);
 
-  function objective(id: string) {
-    const p = lastBest[id];
-    return `Objetivo ${item.target_sets} × ${item.rep_min}–${item.rep_max} · RIR ${item.rir_min}–${item.rir_max}${
+  function objective(m: { id: string; re: RoutineExercise }) {
+    const p = lastBest[m.id];
+    const re = m.re;
+    return `Objetivo ${re.target_sets} × ${re.rep_min}–${re.rep_max} · RIR ${re.rir_min}–${re.rir_max}${
       p ? ` · Última vez ${fmt(p.weight_kg)} kg × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
     }`;
   }
@@ -205,7 +209,10 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
     );
   }
 
-  const done = workingSets.length >= item.target_sets;
+  const done = members.every(
+    (m) =>
+      sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length >= m.re.target_sets,
+  );
   const nextNumber = exSets.length + 1;
 
   function onSave() {
@@ -234,13 +241,24 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
         setTimeout(() => setPrFlash(false), 4000);
       }
       if (!warmup) {
-        const total = item.rest_seconds;
+        const total = active!.re.rest_seconds;
         setRestTotal(total);
         setRestEnd(Date.now() + total * 1000);
         setNow(Date.now());
       }
       setWarmup(false);
-      if (!warmup && members.length === 2) selectSub(activeSub === 0 ? 1 : 0);
+      if (!warmup && members.length > 1) {
+        // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
+        for (let k = 1; k < members.length; k++) {
+          const j = (activeSub + k) % members.length;
+          const m = members[j];
+          const n = sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length;
+          if (n < m.re.target_sets) {
+            selectSub(j);
+            break;
+          }
+        }
+      }
     });
   }
 
@@ -301,7 +319,7 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
             <button
               type="button"
               aria-label="Ejercicio siguiente"
-              disabled={index === items.length - 1}
+              disabled={index === slots.length - 1}
               onClick={() => goTo(index + 1)}
               className="-mr-2.5 flex h-11 w-11 items-center justify-center text-text disabled:opacity-30"
             >
@@ -316,7 +334,7 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
             <h1 className="font-display text-[34px] font-bold leading-[1.05]">
               {members[0].ex.name}
             </h1>
-            <p className="mt-1 text-sm text-muted">{objective(members[0].id)}</p>
+            <p className="mt-1 text-sm text-muted">{objective(members[0])}</p>
           </>
         )}
       </div>
@@ -338,15 +356,15 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
             {pair && (
               <button type="button" onClick={() => selectSub(mi)} className="mb-2 text-left">
                 <p className="text-xs font-semibold tracking-[0.08em] text-accent">
-                  {mi === 0 ? "PRIMERO" : "DESPUÉS"} · EJERCICIO {firstNumber + mi}
+                  {mi === 0 ? "PRIMERO" : "DESPUÉS"} · EJERCICIO {firstNumber + mi} DE {totalExercises}
                 </p>
                 <p className="font-display text-[28px] font-bold leading-[1.05]">
                   {m.ex.name}{" "}
                   <span className="tabular text-base font-semibold text-muted">
-                    {mWork}/{item.target_sets}
+                    {mWork}/{m.re.target_sets}
                   </span>
                 </p>
-                <p className="text-sm text-muted">{objective(m.id)}</p>
+                <p className="text-sm text-muted">{objective(m)}</p>
               </button>
             )}
 
@@ -494,7 +512,7 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
           {pending ? "Guardando…" : warmup ? "Guardar calentamiento" : `Guardar serie ${nextNumber}`}
         </button>
 
-        {done && index < items.length - 1 && (
+        {done && index < slots.length - 1 && (
           <button
             type="button"
             onClick={() => goTo(index + 1)}

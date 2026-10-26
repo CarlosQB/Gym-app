@@ -23,10 +23,8 @@ export type RoutineExercise = {
   rir_min: number;
   rir_max: number;
   rest_seconds: number;
-  alt_exercise_id: string | null;
-  alternate: boolean;
+  with_previous: boolean;
   exercise: Exercise;
-  alt_exercise: Exercise | null;
 };
 
 export type Workout = {

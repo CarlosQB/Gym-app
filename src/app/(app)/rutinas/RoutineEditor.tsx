@@ -33,10 +33,7 @@ type Item = {
   rirMin: string;
   rirMax: string;
   restSeconds: string;
-  altId: string; // "" = sin alterno, NEW = crear, o id del catálogo
-  altNewName: string;
-  altMuscleGroup: string;
-  alternate: boolean;
+  withPrevious: boolean; // va en el mismo bloque que el ejercicio anterior
 };
 
 const input =
@@ -58,10 +55,7 @@ function blank(): Item {
     rirMin: "1",
     rirMax: "2",
     restSeconds: "120",
-    altId: "",
-    altNewName: "",
-    altMuscleGroup: "Pecho",
-    alternate: false,
+    withPrevious: false,
   };
 }
 
@@ -106,10 +100,7 @@ export function RoutineEditor({
             rirMin: String(it.rirMin),
             rirMax: String(it.rirMax),
             restSeconds: String(it.restSeconds),
-            altId: it.altExerciseId ?? "",
-            altNewName: "",
-            altMuscleGroup: "Pecho",
-            alternate: it.alternate,
+            withPrevious: it.withPrevious,
           };
         })
       : [blank()],
@@ -145,10 +136,7 @@ export function RoutineEditor({
         rirMin: Number(it.rirMin),
         rirMax: Number(it.rirMax),
         restSeconds: Number(it.restSeconds),
-        altExerciseId: it.altId && it.altId !== NEW ? it.altId : null,
-        altNewName: it.altId === NEW ? it.altNewName : "",
-        altMuscleGroup: it.altMuscleGroup,
-        alternate: false,
+        withPrevious: it.withPrevious,
       })),
     };
     start(async () => {
@@ -203,7 +191,7 @@ export function RoutineEditor({
       {items.map((it, i) => (
         <section key={it.key} className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold tracking-[0.08em] text-accent">EJERCICIO {i + 1}</p>
+            <p className="text-xs font-semibold tracking-[0.08em] text-accent">EJERCICIO {i + 1}{it.withPrevious && i > 0 ? " · DESPUÉS DEL ANTERIOR" : ""}</p>
             <div className="flex gap-1 text-sm">
               <button
                 type="button"
@@ -284,52 +272,17 @@ export function RoutineEditor({
             <Num label="DESCANSO (s)" value={it.restSeconds} onChange={(v) => patch(it.key, { restSeconds: v })} />
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-line pt-3">
-            <p className="text-xs font-medium tracking-[0.06em] text-muted">
-              SEGUNDO EJERCICIO DESPUÉS DE ESTE (OPCIONAL)
-            </p>
-            <select
-              aria-label="Ejercicio alterno"
-              value={it.altId}
-              onChange={(e) => patch(it.key, { altId: e.target.value })}
-              className={select}
-            >
-              <option value="">Ninguno</option>
-              {catalog
-                .filter((ex) => ex.id !== it.exerciseId)
-                .map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name} · {ex.muscle_group}
-                  </option>
-                ))}
-              <option value={NEW}>+ Ejercicio nuevo…</option>
-            </select>
-
-            {it.altId === NEW && (
-              <>
-                <input
-                  aria-label="Nombre del alterno nuevo"
-                  value={it.altNewName}
-                  onChange={(e) => patch(it.key, { altNewName: e.target.value })}
-                  placeholder="Nombre del ejercicio alterno"
-                  className="h-12 rounded-xl bg-surface-2 px-3 text-[16px] text-text outline-none"
-                />
-                <select
-                  aria-label="Grupo muscular del alterno"
-                  value={it.altMuscleGroup}
-                  onChange={(e) => patch(it.key, { altMuscleGroup: e.target.value })}
-                  className={select}
-                >
-                  {MUSCLES.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-          </div>
+          {i > 0 && (
+            <label className="flex items-center gap-2 border-t border-line pt-3 text-sm">
+              <input
+                type="checkbox"
+                checked={it.withPrevious}
+                onChange={(e) => patch(it.key, { withPrevious: e.target.checked })}
+                className="h-5 w-5 accent-[#cdf545]"
+              />
+              Va después del anterior, en el mismo bloque
+            </label>
+          )}
         </section>
       ))}
 

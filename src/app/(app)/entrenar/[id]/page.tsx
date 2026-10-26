@@ -20,7 +20,7 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
     w.routine_id
       ? supabase
           .from("routine_exercises")
-          .select("*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)")
+          .select("*, exercise:exercises!exercise_id(*)")
           .eq("routine_id", w.routine_id)
           .order("position")
       : Promise.resolve({ data: [] }),
@@ -32,9 +32,7 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
 
   // Mejor serie de la sesión anterior de cada ejercicio (para superarla).
   const lastBest: Record<string, LastBest> = {};
-  const exerciseIds = items.flatMap((i) =>
-    i.alt_exercise_id ? [i.exercise_id, i.alt_exercise_id] : [i.exercise_id],
-  );
+  const exerciseIds = items.map((i) => i.exercise_id);
   if (exerciseIds.length > 0) {
     const { data: prev } = await supabase
       .from("sets")

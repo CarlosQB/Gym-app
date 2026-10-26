@@ -8,9 +8,9 @@ export default async function RutinasPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("routines")
-    .select("*, routine_exercises(alt_exercise_id)")
+    .select("*, routine_exercises(count)")
     .order("position");
-  const routines = (data ?? []) as (Routine & { routine_exercises: { alt_exercise_id: string | null }[] })[];
+  const routines = (data ?? []) as (Routine & { routine_exercises: { count: number }[] })[];
 
   return (
     <div className="flex flex-col gap-5">
@@ -33,7 +33,7 @@ export default async function RutinasPage() {
                   <p className="font-display text-2xl font-bold leading-tight">{r.name}</p>
                   <p className="text-sm text-muted">
                     {r.weekday ? WEEKDAYS[r.weekday] : "Sin día fijo"} ·{" "}
-                    {(r.routine_exercises ?? []).reduce((n, e) => n + (e.alt_exercise_id ? 2 : 1), 0)} ejercicios
+                    {r.routine_exercises?.[0]?.count ?? 0} ejercicios
                   </p>
                 </div>
                 <span className="text-sm text-accent">Editar</span>

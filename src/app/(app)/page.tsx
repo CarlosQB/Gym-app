@@ -51,7 +51,7 @@ export default async function HoyPage() {
   if (todayRoutine) {
     const { data } = await supabase
       .from("routine_exercises")
-      .select("*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)")
+      .select("*, exercise:exercises!exercise_id(*)")
       .eq("routine_id", todayRoutine.id)
       .order("position");
     exercises = (data ?? []) as RoutineExercise[];
@@ -130,26 +130,24 @@ export default async function HoyPage() {
             {todayRoutine.name}
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            {exercises.reduce((n, re) => n + (re.alt_exercise_id ? 2 : 1), 0)} ejercicios
+            {exercises.length} ejercicios
           </p>
 
           <ul className="mt-3">
-            {exercises.flatMap((re) =>
-              [re.exercise, ...(re.alt_exercise ? [re.alt_exercise] : [])].map((ex, k) => (
-                <li
-                  key={`${re.id}-${k}`}
-                  className="flex h-[38px] items-center justify-between border-t border-line text-[15px]"
-                >
-                  <span>
-                    {ex.name}
-                    {k === 1 && <span className="text-muted"> · después</span>}
-                  </span>
-                  <span className="tabular text-muted">
-                    {re.target_sets} × {re.rep_min}–{re.rep_max}
-                  </span>
-                </li>
-              )),
-            )}
+            {exercises.map((re) => (
+              <li
+                key={re.id}
+                className="flex h-[38px] items-center justify-between border-t border-line text-[15px]"
+              >
+                <span>
+                  {re.exercise.name}
+                  {re.with_previous && <span className="text-muted"> · después</span>}
+                </span>
+                <span className="tabular text-muted">
+                  {re.target_sets} × {re.rep_min}–{re.rep_max}
+                </span>
+              </li>
+            ))}
           </ul>
 
           <form action={startWorkout.bind(null, todayRoutine.id)} className="mt-3.5">
