@@ -9,6 +9,20 @@ App personal para llevar el progreso en el gym: series, peso, reps, RIR, rutinas
 - **Entrenar**: lista de rutinas y sesión en curso (peso, reps, RIR, calentamiento, PR, temporizador de descanso, referencia de la vez pasada).
 - Instalable como PWA (manifest). Progreso y Calendario son pantallas de relleno para la Fase 2.
 
+## Mockups
+
+Diseño de las pantallas principales (datos de ejemplo). Los HTML estáticos están en [`docs/mockups/`](docs/mockups/) y se abren directo en el navegador.
+
+| Hoy | Sesión en curso | Historial por ejercicio |
+| :-: | :-: | :-: |
+| <img src="docs/mockups/01-hoy.png" width="220" alt="Pantalla Hoy"> | <img src="docs/mockups/02-sesion.png" width="220" alt="Sesión en curso"> | <img src="docs/mockups/03-historial.png" width="220" alt="Historial por ejercicio"> |
+
+| Progreso semanal | Calendario y racha |
+| :-: | :-: |
+| <img src="docs/mockups/04-progreso.png" width="220" alt="Progreso semanal"> | <img src="docs/mockups/05-calendario.png" width="220" alt="Calendario y racha"> |
+
+Historial, Progreso y Calendario están diseñados pero se implementan en la Fase 2.
+
 ## Puesta en marcha
 
 1. **Supabase**: crea un proyecto en supabase.com → SQL Editor → pega y ejecuta `supabase/schema.sql`.
