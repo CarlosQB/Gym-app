@@ -4,7 +4,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 
 export type Point = { label: string; peso: number; rm: number };
 
-export function ExerciseChart({ data }: { data: Point[] }) {
+export function ExerciseChart({ data, unit }: { data: Point[]; unit: string }) {
   return (
     <div className="h-64 w-full" role="img" aria-label="Gráfica de peso y 1RM estimado por sesión">
       <ResponsiveContainer width="100%" height="100%">
@@ -22,7 +22,7 @@ export function ExerciseChart({ data }: { data: Point[] }) {
             labelStyle={{ color: "#9ba1aa" }}
           />
           <Legend wrapperStyle={{ fontSize: 12, color: "#9ba1aa" }} />
-          <Line type="monotone" dataKey="peso" name="Peso (lb)" stroke="#cdf545" strokeWidth={2.5} dot={{ r: 3 }} />
+          <Line type="monotone" dataKey="peso" name={`Peso (${unit})`} stroke="#cdf545" strokeWidth={2.5} dot={{ r: 3 }} />
           <Line
             type="monotone"
             dataKey="rm"

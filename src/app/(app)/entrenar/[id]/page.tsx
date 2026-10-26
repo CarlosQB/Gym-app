@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SessionView } from "./SessionView";
+import { getUnit } from "@/lib/unit.server";
 import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
 
 export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
   const { id } = await props.params;
   const supabase = await createClient();
+  const unit = await getUnit();
 
   const { data: workout } = await supabase
     .from("workouts")
@@ -63,6 +65,7 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
       items={items}
       sets={sets.map((s) => ({ ...s, weight_kg: Number(s.weight_kg) }))}
       lastBest={lastBest}
+      unit={unit}
     />
   );
 }

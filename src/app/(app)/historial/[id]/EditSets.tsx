@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { deleteSet, updateSet } from "@/app/actions";
 import type { SetKind } from "@/lib/types";
+import { fromDisplay, toDisplay, type Unit } from "@/lib/units";
 
 export type EditableSet = {
   id: string;
@@ -24,8 +25,9 @@ const KINDS: { value: SetKind; label: string }[] = [
 const field =
   "tabular h-11 w-full min-w-0 rounded-xl bg-surface-2 px-2 text-center font-display text-xl font-bold text-text outline-none";
 
-function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number }) {
-  const [weight, setWeight] = useState(String(s.weight_kg));
+function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: number; unit: Unit }) {
+  const shown = toDisplay(s.weight_kg, unit);
+  const [weight, setWeight] = useState(String(shown));
   const [reps, setReps] = useState(String(s.reps));
   const [rir, setRir] = useState(s.rir === null ? "" : String(s.rir));
   const [kind, setKind] = useState<SetKind>(s.kind);
@@ -33,7 +35,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
   const [pending, start] = useTransition();
 
   const dirty =
-    Number(weight.replace(",", ".")) !== s.weight_kg ||
+    Number(weight.replace(",", ".")) !== shown ||
     Number(reps) !== s.reps ||
     (rir === "" ? null : Number(rir)) !== s.rir ||
     kind !== s.kind;
@@ -45,7 +47,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
         setId: s.id,
         workoutId,
         kind,
-        weightKg: Number(weight.replace(",", ".")),
+        weightKg: fromDisplay(Number(weight.replace(",", ".")), unit),
         reps: Number(reps),
         rir: rir === "" ? null : Number(rir),
       });
@@ -65,7 +67,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
       <div className="flex items-center gap-2">
         <span className="w-5 text-sm text-muted">{n}</span>
         <label className="flex-1">
-          <span className="sr-only">Peso (lb)</span>
+          <span className="sr-only">Peso ({unit})</span>
           <input
             inputMode="decimal"
             value={weight}
@@ -74,7 +76,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
             className={field}
           />
         </label>
-        <span className="text-xs text-muted">lb</span>
+        <span className="text-xs text-muted">{unit}</span>
         <label className="w-16">
           <span className="sr-only">Repeticiones</span>
           <input
@@ -136,11 +138,11 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
   );
 }
 
-export function EditSets({ workoutId, sets }: { workoutId: string; sets: EditableSet[] }) {
+export function EditSets({ workoutId, sets, unit }: { workoutId: string; sets: EditableSet[]; unit: Unit }) {
   return (
     <ul>
       {sets.map((s, i) => (
-        <Row key={s.id} workoutId={workoutId} s={s} n={i + 1} />
+        <Row key={`${s.id}-${unit}`} workoutId={workoutId} s={s} n={i + 1} unit={unit} />
       ))}
     </ul>
   );

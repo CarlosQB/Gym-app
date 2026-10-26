@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, formatDayMonth, weekStart } from "@/lib/dates";
+import { getUnit } from "@/lib/unit.server";
+import { toDisplay } from "@/lib/units";
 
 // Rango objetivo de series efectivas por grupo muscular y semana (estimación, ajústalo a tu gusto).
 const TARGET_MIN = 10;
@@ -18,6 +20,7 @@ type PrRow = {
 
 export default async function ProgresoPage() {
   const supabase = await createClient();
+  const unit = await getUnit();
   const now = new Date();
   const thisWeek = weekStart(now);
   const lastWeek = addDays(thisWeek, -7);
@@ -103,7 +106,7 @@ export default async function ProgresoPage() {
               <span className="text-[15px]">{p.exercise?.name}</span>
               <span className="tabular text-sm text-muted">
                 <span className="font-semibold text-warn">
-                  {Number(p.weight_kg)} lb × {p.reps}
+                  {toDisplay(Number(p.weight_kg), unit)} {unit} × {p.reps}
                 </span>{" "}
                 · {formatDayMonth(new Date(p.created_at))}
               </span>

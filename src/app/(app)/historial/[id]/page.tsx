@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayMonth } from "@/lib/dates";
+import { getUnit } from "@/lib/unit.server";
 import { EditSets, type EditableSet } from "./EditSets";
 import { DeleteWorkoutButton } from "./DeleteWorkoutButton";
 
@@ -10,6 +11,7 @@ type Row = EditableSet & { exercise: { name: string; muscle_group: string } | nu
 export default async function HistorialDetallePage(props: PageProps<"/historial/[id]">) {
   const { id } = await props.params;
   const supabase = await createClient();
+  const unit = await getUnit();
 
   const { data: workout } = await supabase
     .from("workouts")
@@ -54,7 +56,7 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
         groups.map((g) => (
           <section key={g.exerciseId} className="rounded-2xl bg-surface p-4">
             <h2 className="mb-2 text-[15px] font-semibold">{g.name}</h2>
-            <EditSets workoutId={id} sets={g.sets} />
+            <EditSets workoutId={id} sets={g.sets} unit={unit} />
           </section>
         ))
       )}

@@ -2,8 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { parseUnit } from "@/lib/units";
 import type { SetKind } from "@/lib/types";
+
+export async function setUnit(unit: string) {
+  (await cookies()).set("unit", parseUnit(unit), {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+  revalidatePath("/", "layout");
+}
 
 export async function seedDefaults() {
   const supabase = await createClient();

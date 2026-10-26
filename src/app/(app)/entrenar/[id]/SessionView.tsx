@@ -4,12 +4,14 @@ import { useEffect, useMemo, useOptimistic, useState, useTransition } from "reac
 import Link from "next/link";
 import { deleteSet, finishWorkout, saveSet } from "@/app/actions";
 import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
+import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
 
 type Props = {
   workout: Workout;
   items: RoutineExercise[];
   sets: SetRow[];
   lastBest: Record<string, LastBest>;
+  unit: Unit;
 };
 
 // Agrupa los ejercicios: los marcados "va después del anterior" se hacen en el mismo bloque.
@@ -89,7 +91,7 @@ function Stepper(props: {
 
 type SetAction = { type: "add"; set: SetRow } | { type: "del"; id: string };
 
-export function SessionView({ workout, items, sets: serverSets, lastBest }: Props) {
+export function SessionView({ workout, items, sets: serverSets, lastBest, unit }: Props) {
   const [pending, startTransition] = useTransition();
   // Las series se ven al instante; el servidor confirma en segundo plano.
   const [sets, applyOptimistic] = useOptimistic(serverSets, (cur: SetRow[], a: SetAction) =>
@@ -116,14 +118,16 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
   // Valores más útiles para precargar al entrar a un ejercicio.
   function defaultsFor(i: number, subIdx = 0) {
     const slot = slots[i];
-    if (!slot) return { weight: "45", reps: "10", rir: null as number | null };
+    if (!slot) return { weight: String(defaultWeight(unit)), reps: "10", rir: null as number | null };
     const it = slot[subIdx] ?? slot[0];
     const id = it.exercise_id;
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
     return {
-      weight: fmt(last?.weight_kg ?? best?.weight_kg ?? 45),
+      weight: fmt(
+        last || best ? toDisplay(last?.weight_kg ?? best!.weight_kg, unit) : defaultWeight(unit),
+      ),
       reps: String(last?.reps ?? it.rep_max ?? 10),
       rir: (last?.rir ?? it.rir_max) as number | null,
     };
@@ -178,7 +182,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
     const p = lastBest[m.id];
     const re = m.re;
     return `Objetivo ${re.target_sets} × ${re.rep_min}–${re.rep_max} · RIR ${re.rir_min}–${re.rir_max}${
-      p ? ` · Última vez ${fmt(p.weight_kg)} lb × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
+      p ? ` · Última vez ${fmt(toDisplay(p.weight_kg, unit))} ${unit} × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
     }`;
   }
 
@@ -222,9 +226,10 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
   const nextNumber = exSets.length + 1;
 
   function onSave() {
-    const w = Number(weight.replace(",", "."));
+    const entered = Number(weight.replace(",", "."));
+    const w = fromDisplay(entered, unit);
     const r = Number(reps);
-    if (!Number.isFinite(w) || w < 0 || !Number.isInteger(r) || r < 1) {
+    if (!Number.isFinite(entered) || entered < 0 || !Number.isInteger(r) || r < 1) {
       setError("Revisa el peso y las repeticiones.");
       return;
     }
@@ -400,7 +405,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
 
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
               <span>SERIE</span>
-              <span>LB</span>
+              <span>{unit.toUpperCase()}</span>
               <span>REPS</span>
               <span>RIR</span>
               <span />
@@ -414,7 +419,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
                 <span className="font-sans text-sm text-muted">
                   {s.kind === "warmup" ? "C" : s.set_number}
                 </span>
-                <span className="tabular">{fmt(s.weight_kg)}</span>
+                <span className="tabular">{fmt(toDisplay(s.weight_kg, unit))}</span>
                 <span className="tabular">{s.reps}</span>
                 <span className="tabular text-muted">{s.rir ?? "—"}</span>
                 <button
@@ -485,7 +490,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
       {/* Captura */}
       <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
         <div className="flex gap-3">
-          <Stepper label="PESO · LB" value={weight} step={5} decimal onChange={setWeight} />
+          <Stepper label={`PESO · ${unit.toUpperCase()}`} value={weight} step={stepFor(unit)} decimal onChange={setWeight} />
           <Stepper label="REPS" value={reps} step={1} onChange={setReps} />
         </div>
 

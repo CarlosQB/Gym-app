@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayMonth } from "@/lib/dates";
+import { getUnit } from "@/lib/unit.server";
+import { toDisplay } from "@/lib/units";
 import { ExerciseChart, type Point } from "./ExerciseChart";
 
 type Row = {
@@ -18,6 +20,7 @@ const epley = (w: number, r: number) => (r <= 1 ? w : w * (1 + r / 30));
 export default async function EjercicioProgresoPage(props: PageProps<"/progreso/[id]">) {
   const { id } = await props.params;
   const supabase = await createClient();
+  const unit = await getUnit();
 
   const { data: ex } = await supabase.from("exercises").select("id, name, muscle_group").eq("id", id).maybeSingle();
   if (!ex) notFound();
@@ -47,8 +50,8 @@ export default async function EjercicioProgresoPage(props: PageProps<"/progreso/
   const sessions = [...byWorkout.values()].sort((a, b) => a.date.localeCompare(b.date));
   const points: Point[] = sessions.map((s) => ({
     label: formatDayMonth(new Date(s.date)),
-    peso: s.best.w,
-    rm: Math.round(s.oneRm * 10) / 10,
+    peso: toDisplay(s.best.w, unit),
+    rm: Math.round(toDisplay(s.oneRm, unit) * 10) / 10,
   }));
   const prWeight = sessions.reduce((m, s) => Math.max(m, s.best.w), 0);
   const bestRm = sessions.reduce((m, s) => Math.max(m, s.oneRm), 0);
@@ -70,17 +73,17 @@ export default async function EjercicioProgresoPage(props: PageProps<"/progreso/
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-surface p-4">
               <p className="text-xs text-muted">Mejor peso</p>
-              <p className="tabular font-display text-3xl font-bold text-accent">{prWeight} lb</p>
+              <p className="tabular font-display text-3xl font-bold text-accent">{toDisplay(prWeight, unit)} {unit}</p>
             </div>
             <div className="rounded-2xl bg-surface p-4">
               <p className="text-xs text-muted">1RM estimado (Epley)</p>
-              <p className="tabular font-display text-3xl font-bold">{Math.round(bestRm * 10) / 10} lb</p>
+              <p className="tabular font-display text-3xl font-bold">{Math.round(toDisplay(bestRm, unit) * 10) / 10} {unit}</p>
             </div>
           </div>
 
           <section className="rounded-2xl bg-surface p-4">
             <h2 className="mb-2 font-display text-xl font-bold">Mejor serie por sesión</h2>
-            <ExerciseChart data={points} />
+            <ExerciseChart data={points} unit={unit} />
           </section>
 
           <section className="rounded-2xl bg-surface p-4">
@@ -91,7 +94,7 @@ export default async function EjercicioProgresoPage(props: PageProps<"/progreso/
               >
                 <span className="text-[15px]">{formatDayMonth(new Date(s.date))}</span>
                 <span className="tabular text-sm text-muted">
-                  {s.best.w} lb × {s.best.r} · {s.sets} series · 1RM ≈ {Math.round(s.oneRm * 10) / 10} lb
+                  {toDisplay(s.best.w, unit)} {unit} × {s.best.r} · {s.sets} series · 1RM ≈ {Math.round(toDisplay(s.oneRm, unit) * 10) / 10} {unit}
                 </span>
               </div>
             ))}

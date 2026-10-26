@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getUnit } from "@/lib/unit.server";
+import { UnitToggle } from "@/components/UnitToggle";
 import { seedDefaults, startWorkout, signOut } from "@/app/actions";
 import {
   addDays,
@@ -17,6 +19,7 @@ const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
 export default async function HoyPage() {
   const supabase = await createClient();
+  const unit = await getUnit();
   const now = new Date();
   const todayYmd = localYmd(now);
   const todayWeekday = isoWeekday(now);
@@ -201,6 +204,8 @@ export default async function HoyPage() {
       <Link href="/historial" className="text-sm text-accent underline">
         Ver y editar sesiones anteriores
       </Link>
+
+      <UnitToggle unit={unit} />
 
       <form action={signOut} className="pt-2">
         <button type="submit" className="text-sm text-muted underline">
