@@ -116,14 +116,14 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
   // Valores más útiles para precargar al entrar a un ejercicio.
   function defaultsFor(i: number, subIdx = 0) {
     const slot = slots[i];
-    if (!slot) return { weight: "20", reps: "10", rir: null as number | null };
+    if (!slot) return { weight: "45", reps: "10", rir: null as number | null };
     const it = slot[subIdx] ?? slot[0];
     const id = it.exercise_id;
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
     return {
-      weight: fmt(last?.weight_kg ?? best?.weight_kg ?? 20),
+      weight: fmt(last?.weight_kg ?? best?.weight_kg ?? 45),
       reps: String(last?.reps ?? it.rep_max ?? 10),
       rir: (last?.rir ?? it.rir_max) as number | null,
     };
@@ -178,7 +178,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
     const p = lastBest[m.id];
     const re = m.re;
     return `Objetivo ${re.target_sets} × ${re.rep_min}–${re.rep_max} · RIR ${re.rir_min}–${re.rir_max}${
-      p ? ` · Última vez ${fmt(p.weight_kg)} kg × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
+      p ? ` · Última vez ${fmt(p.weight_kg)} lb × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
     }`;
   }
 
@@ -400,7 +400,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
 
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
               <span>SERIE</span>
-              <span>KG</span>
+              <span>LB</span>
               <span>REPS</span>
               <span>RIR</span>
               <span />
@@ -485,7 +485,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest }: Prop
       {/* Captura */}
       <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
         <div className="flex gap-3">
-          <Stepper label="PESO · KG" value={weight} step={2.5} decimal onChange={setWeight} />
+          <Stepper label="PESO · LB" value={weight} step={5} decimal onChange={setWeight} />
           <Stepper label="REPS" value={reps} step={1} onChange={setReps} />
         </div>
 

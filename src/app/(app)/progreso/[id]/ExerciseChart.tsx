@@ -22,7 +22,7 @@ export function ExerciseChart({ data }: { data: Point[] }) {
             labelStyle={{ color: "#9ba1aa" }}
           />
           <Legend wrapperStyle={{ fontSize: 12, color: "#9ba1aa" }} />
-          <Line type="monotone" dataKey="peso" name="Peso (kg)" stroke="#cdf545" strokeWidth={2.5} dot={{ r: 3 }} />
+          <Line type="monotone" dataKey="peso" name="Peso (lb)" stroke="#cdf545" strokeWidth={2.5} dot={{ r: 3 }} />
           <Line
             type="monotone"
             dataKey="rm"

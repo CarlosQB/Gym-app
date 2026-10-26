@@ -70,11 +70,11 @@ export default async function EjercicioProgresoPage(props: PageProps<"/progreso/
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-surface p-4">
               <p className="text-xs text-muted">Mejor peso</p>
-              <p className="tabular font-display text-3xl font-bold text-accent">{prWeight} kg</p>
+              <p className="tabular font-display text-3xl font-bold text-accent">{prWeight} lb</p>
             </div>
             <div className="rounded-2xl bg-surface p-4">
               <p className="text-xs text-muted">1RM estimado (Epley)</p>
-              <p className="tabular font-display text-3xl font-bold">{Math.round(bestRm * 10) / 10} kg</p>
+              <p className="tabular font-display text-3xl font-bold">{Math.round(bestRm * 10) / 10} lb</p>
             </div>
           </div>
 
@@ -91,7 +91,7 @@ export default async function EjercicioProgresoPage(props: PageProps<"/progreso/
               >
                 <span className="text-[15px]">{formatDayMonth(new Date(s.date))}</span>
                 <span className="tabular text-sm text-muted">
-                  {s.best.w} kg × {s.best.r} · {s.sets} series · 1RM ≈ {Math.round(s.oneRm * 10) / 10}
+                  {s.best.w} lb × {s.best.r} · {s.sets} series · 1RM ≈ {Math.round(s.oneRm * 10) / 10} lb
                 </span>
               </div>
             ))}

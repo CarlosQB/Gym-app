@@ -62,7 +62,7 @@ create table if not exists public.sets (
   exercise_id uuid not null references public.exercises(id) on delete cascade,
   set_number smallint not null,
   kind text not null default 'normal' check (kind in ('warmup', 'normal', 'dropset')),
-  weight_kg numeric(6,2) not null check (weight_kg >= 0),
+  weight_kg numeric(6,2) not null check (weight_kg >= 0), -- el nombre es histórico: se guarda en LIBRAS
   reps smallint not null check (reps >= 0),
   rir smallint check (rir between 0 and 10),
   is_pr boolean not null default false,

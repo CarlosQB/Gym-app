@@ -1,6 +1,6 @@
 # Gym
 
-App personal para llevar el progreso en el gym: series, peso, reps, RIR, rutinas y descansos. Next.js (App Router) + Tailwind + Supabase, pensada para desplegarse en Vercel y usarse desde el celular.
+App personal para llevar el progreso en el gym: series, peso (en libras), reps, RIR, rutinas y descansos. Next.js (App Router) + Tailwind + Supabase, pensada para desplegarse en Vercel y usarse desde el celular.
 
 ## Estado
 

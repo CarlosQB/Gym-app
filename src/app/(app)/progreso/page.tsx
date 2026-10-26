@@ -103,7 +103,7 @@ export default async function ProgresoPage() {
               <span className="text-[15px]">{p.exercise?.name}</span>
               <span className="tabular text-sm text-muted">
                 <span className="font-semibold text-warn">
-                  {Number(p.weight_kg)} kg × {p.reps}
+                  {Number(p.weight_kg)} lb × {p.reps}
                 </span>{" "}
                 · {formatDayMonth(new Date(p.created_at))}
               </span>

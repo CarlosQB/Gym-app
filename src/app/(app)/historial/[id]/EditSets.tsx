@@ -65,7 +65,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
       <div className="flex items-center gap-2">
         <span className="w-5 text-sm text-muted">{n}</span>
         <label className="flex-1">
-          <span className="sr-only">Peso (kg)</span>
+          <span className="sr-only">Peso (lb)</span>
           <input
             inputMode="decimal"
             value={weight}
@@ -74,7 +74,7 @@ function Row({ workoutId, s, n }: { workoutId: string; s: EditableSet; n: number
             className={field}
           />
         </label>
-        <span className="text-xs text-muted">kg</span>
+        <span className="text-xs text-muted">lb</span>
         <label className="w-16">
           <span className="sr-only">Repeticiones</span>
           <input
