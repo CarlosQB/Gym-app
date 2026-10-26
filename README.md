@@ -2,11 +2,13 @@
 
 App personal para llevar el progreso en el gym: series, peso, reps, RIR, rutinas y descansos. Next.js (App Router) + Tailwind + Supabase, pensada para desplegarse en Vercel y usarse desde el celular.
 
-## Estado (Fase 1)
+## Estado
 
 - Login con correo y contraseña (Supabase Auth), todo protegido por RLS.
 - **Hoy**: rutina del día, semana, racha y última sesión.
 - **Entrenar**: lista de rutinas y sesión en curso (peso, reps, RIR, calentamiento, PR, temporizador de descanso, referencia de la vez pasada).
+- **Historial**: lista de sesiones; cada una se puede editar (peso, reps, RIR, tipo de serie), borrar serie por serie o borrar completa.
+- **Mis rutinas**: crea, edita y borra tus rutinas (día, ejercicios nuevos o del catálogo, series, rango de reps y RIR, descanso, orden).
 - Instalable como PWA (manifest). Progreso y Calendario son pantallas de relleno para la Fase 2.
 
 ## Mockups
@@ -46,4 +48,4 @@ Historial, Progreso y Calendario están diseñados pero se implementan en la Fas
 
 ## Siguiente (Fase 2)
 
-Historial por ejercicio con gráfica y 1RM estimado, series efectivas por grupo muscular, calendario y racha, editor de rutinas y ejercicios, y modo offline para sesiones.
+Historial por ejercicio con gráfica y 1RM estimado, series efectivas por grupo muscular, calendario y racha, y modo offline para sesiones.

@@ -61,3 +61,14 @@ export function streakWeeks(workoutDates: Date[], now = new Date()): number {
 export function minutesBetween(a: string, b: string): number {
   return Math.max(1, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000));
 }
+
+export function formatDayMonth(d: Date): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+    .format(d)
+    .replace(/\./g, "");
+}

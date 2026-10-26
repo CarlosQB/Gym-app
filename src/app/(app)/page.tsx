@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { seedDefaults, startWorkout, signOut } from "@/app/actions";
 import {
@@ -31,7 +32,7 @@ export default async function HoyPage() {
       .gte("started_at", since),
     supabase
       .from("workouts")
-      .select("name, started_at, ended_at, sets(count)")
+      .select("id, name, started_at, ended_at, sets(count)")
       .not("ended_at", "is", null)
       .order("started_at", { ascending: false })
       .limit(1)
@@ -75,7 +76,7 @@ export default async function HoyPage() {
     .join(" · ");
 
   const last = lastRes.data as
-    | { name: string; started_at: string; ended_at: string; sets: { count: number }[] }
+    | { id: string; name: string; started_at: string; ended_at: string; sets: { count: number }[] }
     | null;
 
   const userName = process.env.NEXT_PUBLIC_USER_NAME;
@@ -159,12 +160,18 @@ export default async function HoyPage() {
         <section className="flex flex-col gap-3 rounded-[20px] bg-surface p-[18px]">
           <h2 className="font-display text-3xl font-bold">Aún no hay rutinas</h2>
           <p className="text-sm text-muted">
-            Carga una rutina de ejemplo (Torso A · Empuje) para empezar y luego la ajustas.
+            Crea tu propia rutina o carga una de ejemplo (Torso A · Empuje) y luego la ajustas.
           </p>
+          <Link
+            href="/rutinas/nueva"
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-accent text-lg font-semibold text-bg"
+          >
+            Crear mi rutina
+          </Link>
           <form action={seedDefaults}>
             <button
               type="submit"
-              className="h-14 w-full rounded-2xl bg-accent text-lg font-semibold text-bg"
+              className="h-14 w-full rounded-2xl bg-surface-2 text-lg font-semibold text-text"
             >
               Cargar rutina de ejemplo
             </button>
@@ -173,7 +180,10 @@ export default async function HoyPage() {
       )}
 
       {last && (
-        <section className="flex h-16 items-center justify-between rounded-2xl bg-surface px-4">
+        <Link
+          href={`/historial/${last.id}`}
+          className="flex h-16 items-center justify-between rounded-2xl bg-surface px-4"
+        >
           <div>
             <p className="text-xs text-muted">Última sesión</p>
             <p className="text-[15px] font-medium">
@@ -184,8 +194,12 @@ export default async function HoyPage() {
             {last.sets?.[0]?.count ?? 0} series ·{" "}
             {minutesBetween(last.started_at, last.ended_at)} min
           </p>
-        </section>
+        </Link>
       )}
+
+      <Link href="/historial" className="text-sm text-accent underline">
+        Ver y editar sesiones anteriores
+      </Link>
 
       <form action={signOut} className="pt-2">
         <button type="submit" className="text-sm text-muted underline">

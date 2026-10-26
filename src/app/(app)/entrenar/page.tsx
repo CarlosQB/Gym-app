@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { startWorkout } from "@/app/actions";
 import type { Routine } from "@/lib/types";
@@ -15,7 +16,7 @@ export default async function EntrenarPage() {
 
       {routines.length === 0 ? (
         <p className="text-muted">
-          No tienes rutinas todavía. Cárgalas desde la pantalla Hoy.
+          No tienes rutinas todavía. Crea la tuya abajo.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -39,6 +40,21 @@ export default async function EntrenarPage() {
           ))}
         </ul>
       )}
+
+      <div className="flex gap-3">
+        <Link
+          href="/rutinas"
+          className="flex h-12 flex-1 items-center justify-center rounded-xl bg-surface-2 font-semibold"
+        >
+          Mis rutinas
+        </Link>
+        <Link
+          href="/historial"
+          className="flex h-12 flex-1 items-center justify-center rounded-xl bg-surface-2 font-semibold"
+        >
+          Historial
+        </Link>
+      </div>
     </div>
   );
 }

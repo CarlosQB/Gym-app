@@ -107,6 +107,185 @@ export async function deleteSet(setId: string, workoutId: string) {
   revalidatePath(`/entrenar/${workoutId}`);
 }
 
+export type UpdateSetInput = {
+  setId: string;
+  workoutId: string;
+  kind: SetKind;
+  weightKg: number;
+  reps: number;
+  rir: number | null;
+};
+
+export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; error?: string }> {
+  if (
+    !Number.isFinite(input.weightKg) ||
+    input.weightKg < 0 ||
+    !Number.isInteger(input.reps) ||
+    input.reps < 0 ||
+    (input.rir !== null && (!Number.isInteger(input.rir) || input.rir < 0 || input.rir > 10))
+  ) {
+    return { ok: false, error: "Datos inválidos" };
+  }
+  const supabase = await createClient();
+  const patch: Record<string, unknown> = {
+    kind: input.kind,
+    weight_kg: input.weightKg,
+    reps: input.reps,
+    rir: input.rir,
+  };
+  if (input.kind !== "normal") patch.is_pr = false;
+  const { error } = await supabase.from("sets").update(patch).eq("id", input.setId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/historial/${input.workoutId}`);
+  revalidatePath("/historial");
+  return { ok: true };
+}
+
+export async function deleteWorkout(workoutId: string) {
+  const supabase = await createClient();
+  // Las series se borran en cascada.
+  await supabase.from("workouts").delete().eq("id", workoutId);
+  revalidatePath("/");
+  revalidatePath("/historial");
+  redirect("/historial");
+}
+
+export type RoutineItemInput = {
+  exerciseId: string | null;
+  newName: string;
+  muscleGroup: string;
+  targetSets: number;
+  repMin: number;
+  repMax: number;
+  rirMin: number;
+  rirMax: number;
+  restSeconds: number;
+};
+
+export type RoutineInput = {
+  id: string | null;
+  name: string;
+  weekday: number | null;
+  items: RoutineItemInput[];
+};
+
+const inRange = (n: number, min: number, max: number) =>
+  Number.isInteger(n) && n >= min && n <= max;
+
+export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; error: string }> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Ponle un nombre a la rutina" };
+  if (input.weekday !== null && !inRange(input.weekday, 1, 7)) {
+    return { ok: false, error: "Día inválido" };
+  }
+  if (input.items.length === 0) return { ok: false, error: "Agrega al menos un ejercicio" };
+
+  for (const [i, it] of input.items.entries()) {
+    const n = i + 1;
+    if (!it.exerciseId && !it.newName.trim()) {
+      return { ok: false, error: `Ejercicio ${n}: elige uno o escribe el nombre` };
+    }
+    if (
+      !inRange(it.targetSets, 1, 20) ||
+      !inRange(it.repMin, 1, 100) ||
+      !inRange(it.repMax, 1, 100) ||
+      it.repMin > it.repMax ||
+      !inRange(it.rirMin, 0, 10) ||
+      !inRange(it.rirMax, 0, 10) ||
+      it.rirMin > it.rirMax ||
+      !inRange(it.restSeconds, 0, 1200)
+    ) {
+      return { ok: false, error: `Ejercicio ${n}: revisa series, reps, RIR y descanso` };
+    }
+  }
+
+  const supabase = await createClient();
+
+  // 1. Rutina
+  let routineId = input.id;
+  if (routineId) {
+    const { error } = await supabase
+      .from("routines")
+      .update({ name, weekday: input.weekday })
+      .eq("id", routineId);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { count } = await supabase
+      .from("routines")
+      .select("id", { count: "exact", head: true });
+    const { data, error } = await supabase
+      .from("routines")
+      .insert({ name, weekday: input.weekday, position: count ?? 0 })
+      .select("id")
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "No se pudo crear" };
+    routineId = data.id;
+  }
+
+  // 2. Ejercicios nuevos (si el nombre ya existe se reutiliza)
+  const exerciseIds: string[] = [];
+  for (const it of input.items) {
+    if (it.exerciseId) {
+      exerciseIds.push(it.exerciseId);
+      continue;
+    }
+    const exName = it.newName.trim();
+    const { data: found } = await supabase
+      .from("exercises")
+      .select("id")
+      .eq("name", exName)
+      .maybeSingle();
+    if (found) {
+      exerciseIds.push(found.id);
+      continue;
+    }
+    const { data: created, error } = await supabase
+      .from("exercises")
+      .insert({ name: exName, muscle_group: it.muscleGroup || "Otro" })
+      .select("id")
+      .single();
+    if (error || !created) return { ok: false, error: error?.message ?? "No se pudo crear el ejercicio" };
+    exerciseIds.push(created.id);
+  }
+
+  // 3. Se insertan las filas nuevas y después se borran las anteriores (no se pierde nada si falla).
+  const { data: old } = await supabase
+    .from("routine_exercises")
+    .select("id")
+    .eq("routine_id", routineId);
+
+  const { error: insErr } = await supabase.from("routine_exercises").insert(
+    input.items.map((it, i) => ({
+      routine_id: routineId,
+      exercise_id: exerciseIds[i],
+      position: i,
+      target_sets: it.targetSets,
+      rep_min: it.repMin,
+      rep_max: it.repMax,
+      rir_min: it.rirMin,
+      rir_max: it.rirMax,
+      rest_seconds: it.restSeconds,
+    })),
+  );
+  if (insErr) return { ok: false, error: insErr.message };
+
+  const oldIds = (old ?? []).map((r) => r.id);
+  if (oldIds.length > 0) {
+    await supabase.from("routine_exercises").delete().in("id", oldIds);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/rutinas");
+}
+
+export async function deleteRoutine(routineId: string) {
+  const supabase = await createClient();
+  // Las sesiones ya guardadas se conservan (routine_id pasa a null).
+  await supabase.from("routines").delete().eq("id", routineId);
+  revalidatePath("/", "layout");
+  redirect("/rutinas");
+}
+
 export async function finishWorkout(workoutId: string) {
   const supabase = await createClient();
   await supabase
