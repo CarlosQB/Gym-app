@@ -11,6 +11,13 @@ App personal para llevar el progreso en el gym: series, peso (en libras), reps, 
 - **Mis rutinas**: crea, edita y borra tus rutinas (día, ejercicios nuevos o del catálogo, series, rango de reps y RIR, descanso, orden).
 - Instalable como PWA (manifest). Progreso (series efectivas por grupo, PRs, gráfica y 1RM estimado por ejercicio) y Calendario (mes, racha semanal).
 
+## Modo offline
+
+- Una **sesión ya iniciada** se puede seguir capturando sin señal: las series, los borrados y el "Terminar" se guardan en el teléfono (`localStorage`) y se envían solos, en orden, cuando vuelve la conexión. Un banner arriba muestra el estado.
+- Un service worker (`public/sw.js`) guarda las pantallas que ya abriste y los archivos de la app para que abran sin red.
+- Cada serie lleva un id generado en el cliente, así que un reintento nunca la duplica.
+- Límites: **iniciar** una sesión nueva requiere conexión (abre la sesión una vez con señal), y el aviso de PR se calcula al sincronizar.
+
 ## Mockups
 
 Diseño de las pantallas principales (datos de ejemplo). Los HTML estáticos están en [`docs/mockups/`](docs/mockups/) y se abren directo en el navegador.

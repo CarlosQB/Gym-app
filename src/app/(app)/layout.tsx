@@ -1,4 +1,6 @@
 import { BottomNav } from "@/components/BottomNav";
+import { OfflineSync } from "@/components/OfflineSync";
+import { RegisterSW } from "@/components/RegisterSW";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
@@ -7,6 +9,8 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         {children}
       </div>
       <BottomNav />
+      <OfflineSync />
+      <RegisterSW />
     </>
   );
 }

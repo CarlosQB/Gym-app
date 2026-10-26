@@ -57,6 +57,8 @@ export async function startWorkout(routineId: string) {
 }
 
 export type SaveSetInput = {
+  /** Id generado en el cliente: permite reintentar sin duplicar la serie. */
+  id?: string;
   workoutId: string;
   exerciseId: string;
   kind: SetKind;
@@ -99,6 +101,7 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
   const isPr = input.kind === "normal" && !!prev && input.weightKg > Number(prev.weight_kg);
 
   const { error } = await supabase.from("sets").insert({
+    id: input.id,
     workout_id: input.workoutId,
     exercise_id: input.exerciseId,
     set_number: (count ?? 0) + 1,
@@ -108,7 +111,8 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
     rir: input.rir,
     is_pr: isPr,
   });
-  if (error) return { ok: false, error: error.message };
+  // 23505 = ya existía (se reintentó una serie que sí llegó): se da por buena.
+  if (error && error.code !== "23505") return { ok: false, error: error.message };
 
   revalidatePath(`/entrenar/${input.workoutId}`);
   return { ok: true, isPr };
@@ -314,6 +318,18 @@ export async function finishWorkout(workoutId: string) {
     .eq("id", workoutId);
   revalidatePath("/");
   redirect("/");
+}
+
+// Igual que finishWorkout pero sin redirigir: lo usa la sincronización en segundo plano.
+export async function syncFinish(workoutId: string, endedAt: string) {
+  const supabase = await createClient();
+  const when = new Date(endedAt);
+  await supabase
+    .from("workouts")
+    .update({ ended_at: Number.isNaN(when.getTime()) ? new Date().toISOString() : when.toISOString() })
+    .eq("id", workoutId)
+    .is("ended_at", null);
+  revalidatePath("/", "layout");
 }
 
 export async function signOut() {
