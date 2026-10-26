@@ -66,6 +66,7 @@ create table if not exists public.sets (
   reps smallint not null check (reps >= 0),
   rir smallint check (rir between 0 and 10),
   is_pr boolean not null default false,
+  note text, -- nota opcional (migrations/004)
   created_at timestamptz not null default now()
 );
 

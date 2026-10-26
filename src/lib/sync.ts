@@ -14,6 +14,7 @@ async function run(op: Op) {
       weightKg: op.weightKg,
       reps: op.reps,
       rir: op.rir,
+      note: op.note,
     });
     if (!res.ok) throw new Error(res.error ?? "No se pudo guardar");
   } else if (op.op === "del") {
