@@ -9,7 +9,7 @@ App personal para llevar el progreso en el gym: series, peso, reps, RIR, rutinas
 - **Entrenar**: lista de rutinas y sesión en curso (peso, reps, RIR, calentamiento, PR, temporizador de descanso, referencia de la vez pasada).
 - **Historial**: lista de sesiones; cada una se puede editar (peso, reps, RIR, tipo de serie), borrar serie por serie o borrar completa.
 - **Mis rutinas**: crea, edita y borra tus rutinas (día, ejercicios nuevos o del catálogo, series, rango de reps y RIR, descanso, orden).
-- Instalable como PWA (manifest). Progreso y Calendario son pantallas de relleno para la Fase 2.
+- Instalable como PWA (manifest). Progreso (series efectivas por grupo, PRs, gráfica y 1RM estimado por ejercicio) y Calendario (mes, racha semanal).
 
 ## Mockups
 
@@ -23,7 +23,7 @@ Diseño de las pantallas principales (datos de ejemplo). Los HTML estáticos est
 | :-: | :-: |
 | <img src="docs/mockups/04-progreso.png" width="220" alt="Progreso semanal"> | <img src="docs/mockups/05-calendario.png" width="220" alt="Calendario y racha"> |
 
-Historial, Progreso y Calendario están diseñados pero se implementan en la Fase 2.
+Historial por ejercicio, Progreso y Calendario ya están implementados.
 
 ## Puesta en marcha
 
@@ -48,4 +48,4 @@ Historial, Progreso y Calendario están diseñados pero se implementan en la Fas
 
 ## Siguiente (Fase 2)
 
-Historial por ejercicio con gráfica y 1RM estimado, series efectivas por grupo muscular, calendario y racha, y modo offline para sesiones.
+Modo offline para sesiones y más métricas corporales.
