@@ -134,22 +134,22 @@ export default async function HoyPage() {
           </p>
 
           <ul className="mt-3">
-            {exercises.map((re) => (
-              <li
-                key={re.id}
-                className="flex h-[38px] items-center justify-between border-t border-line text-[15px]"
-              >
-                <span>
-                  {re.exercise.name}
-                  {re.alt_exercise && (
-                    <span className="text-muted"> / {re.alt_exercise.name}</span>
-                  )}
-                </span>
-                <span className="tabular text-muted">
-                  {re.target_sets} × {re.rep_min}–{re.rep_max}
-                </span>
-              </li>
-            ))}
+            {exercises.flatMap((re) =>
+              [re.exercise, ...(re.alt_exercise ? [re.alt_exercise] : [])].map((ex, k) => (
+                <li
+                  key={`${re.id}-${k}`}
+                  className="flex h-[38px] items-center justify-between border-t border-line text-[15px]"
+                >
+                  <span>
+                    {ex.name}
+                    {k === 1 && <span className="text-muted"> · después</span>}
+                  </span>
+                  <span className="tabular text-muted">
+                    {re.target_sets} × {re.rep_min}–{re.rep_max}
+                  </span>
+                </li>
+              )),
+            )}
           </ul>
 
           <form action={startWorkout.bind(null, todayRoutine.id)} className="mt-3.5">

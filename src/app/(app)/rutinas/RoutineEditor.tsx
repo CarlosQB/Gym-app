@@ -148,7 +148,7 @@ export function RoutineEditor({
         altExerciseId: it.altId && it.altId !== NEW ? it.altId : null,
         altNewName: it.altId === NEW ? it.altNewName : "",
         altMuscleGroup: it.altMuscleGroup,
-        alternate: !!it.altId && it.alternate,
+        alternate: false,
       })),
     };
     start(async () => {
@@ -286,7 +286,7 @@ export function RoutineEditor({
 
           <div className="flex flex-col gap-2 border-t border-line pt-3">
             <p className="text-xs font-medium tracking-[0.06em] text-muted">
-              EJERCICIO ALTERNO (OPCIONAL)
+              SEGUNDO EJERCICIO DESPUÉS DE ESTE (OPCIONAL)
             </p>
             <select
               aria-label="Ejercicio alterno"
@@ -294,7 +294,7 @@ export function RoutineEditor({
               onChange={(e) => patch(it.key, { altId: e.target.value })}
               className={select}
             >
-              <option value="">Sin alterno</option>
+              <option value="">Ninguno</option>
               {catalog
                 .filter((ex) => ex.id !== it.exerciseId)
                 .map((ex) => (
@@ -329,17 +329,6 @@ export function RoutineEditor({
               </>
             )}
 
-            {it.altId && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={it.alternate}
-                  onChange={(e) => patch(it.key, { alternate: e.target.checked })}
-                  className="h-5 w-5 accent-[#cdf545]"
-                />
-                Alternar uno y otro cada sesión
-              </label>
-            )}
           </div>
         </section>
       ))}

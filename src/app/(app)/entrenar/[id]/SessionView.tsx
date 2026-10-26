@@ -10,14 +10,15 @@ type Props = {
   items: RoutineExercise[];
   sets: SetRow[];
   lastBest: Record<string, LastBest>;
-  initialAlt: Record<string, boolean>;
 };
 
-// Ejercicio que se está haciendo en este lugar de la rutina (principal o alterno).
-function pick(it: RoutineExercise, useAlt: boolean) {
-  return useAlt && it.alt_exercise && it.alt_exercise_id
-    ? { id: it.alt_exercise_id, ex: it.alt_exercise }
-    : { id: it.exercise_id, ex: it.exercise };
+// Ejercicios de un lugar de la rutina: uno solo, o dos que se hacen uno después del otro.
+function membersOf(it: RoutineExercise) {
+  const list = [{ id: it.exercise_id, ex: it.exercise }];
+  if (it.alt_exercise && it.alt_exercise_id) {
+    list.push({ id: it.alt_exercise_id, ex: it.alt_exercise });
+  }
+  return list;
 }
 
 function fmt(n: number) {
@@ -85,9 +86,10 @@ function Stepper(props: {
   );
 }
 
-export function SessionView({ workout, items, sets, lastBest, initialAlt }: Props) {
+export function SessionView({ workout, items, sets, lastBest }: Props) {
   const [pending, startTransition] = useTransition();
-  const [alt, setAlt] = useState<Record<string, boolean>>(initialAlt);
+  // Cuál de los dos ejercicios de un lugar está activo (0 = primero, 1 = después).
+  const [sub, setSub] = useState<Record<string, number>>({});
 
   // Ejercicio inicial: el primero que aún no completa sus series objetivo.
   const initialIndex = useMemo(() => {
@@ -106,10 +108,10 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
   }, []);
 
   // Valores más útiles para precargar al entrar a un ejercicio.
-  function defaultsFor(i: number, map: Record<string, boolean> = alt) {
+  function defaultsFor(i: number, subIdx = 0) {
     const it = items[i];
     if (!it) return { weight: "20", reps: "10", rir: null as number | null };
-    const id = pick(it, !!map[it.id]).id;
+    const id = (membersOf(it)[subIdx] ?? membersOf(it)[0]).id;
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
@@ -129,13 +131,14 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
   const [prFlash, setPrFlash] = useState(false);
 
   const item = items[index];
-  const active = item ? pick(item, !!alt[item.id]) : null;
+  const members = item ? membersOf(item) : [];
+  const activeSub = item ? Math.min(sub[item.id] ?? 0, members.length - 1) : 0;
+  const active = item ? members[activeSub] : null;
   const exSets = active ? sets.filter((s) => s.exercise_id === active.id) : [];
   const workingSets = exSets.filter((s) => s.kind !== "warmup");
-  const prev = active ? lastBest[active.id] : undefined;
 
   function goTo(i: number) {
-    const d = defaultsFor(i);
+    const d = defaultsFor(i, 0);
     setIndex(i);
     setWeight(d.weight);
     setReps(d.reps);
@@ -144,11 +147,10 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
     setError(null);
   }
 
-  function swap() {
+  function selectSub(n: number) {
     if (!item) return;
-    const next = { ...alt, [item.id]: !alt[item.id] };
-    setAlt(next);
-    const d = defaultsFor(index, next);
+    setSub((m) => ({ ...m, [item.id]: n }));
+    const d = defaultsFor(index, n);
     setWeight(d.weight);
     setReps(d.reps);
     setRir(d.rir);
@@ -162,6 +164,13 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
   const firstNumber = 1 + sizes.slice(0, index).reduce((a, b) => a + b, 0);
   const numberLabel =
     sizes[index] === 2 ? `${firstNumber} · ${firstNumber + 1}` : String(firstNumber);
+
+  function objective(id: string) {
+    const p = lastBest[id];
+    return `Objetivo ${item.target_sets} × ${item.rep_min}–${item.rep_max} · RIR ${item.rir_min}–${item.rir_max}${
+      p ? ` · Última vez ${fmt(p.weight_kg)} kg × ${p.reps}${p.rir !== null ? ` @ RIR ${p.rir}` : ""}` : ""
+    }`;
+  }
 
   // Reloj de la sesión
   const [elapsed, setElapsed] = useState(0);
@@ -231,6 +240,7 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
         setNow(Date.now());
       }
       setWarmup(false);
+      if (!warmup && members.length === 2) selectSub(activeSub === 0 ? 1 : 0);
     });
   }
 
@@ -301,76 +311,97 @@ export function SessionView({ workout, items, sets, lastBest, initialAlt }: Prop
             </button>
           </div>
         </div>
-        <h1 className="font-display text-[34px] font-bold leading-[1.05]">
-          {active!.ex.name}
-        </h1>
-        {item.alt_exercise && (
-          <button
-            type="button"
-            onClick={swap}
-            className="mt-1 h-9 rounded-full bg-surface-2 px-3 text-[13px] font-semibold text-accent"
-          >
-            Cambiar a {alt[item.id] ? item.exercise.name : item.alt_exercise.name}
-          </button>
+        {members.length === 1 && (
+          <>
+            <h1 className="font-display text-[34px] font-bold leading-[1.05]">
+              {members[0].ex.name}
+            </h1>
+            <p className="mt-1 text-sm text-muted">{objective(members[0].id)}</p>
+          </>
         )}
-        <p className="mt-1 text-sm text-muted">
-          Objetivo {item.target_sets} × {item.rep_min}–{item.rep_max} · RIR {item.rir_min}–
-          {item.rir_max}
-          {prev ? ` · Última vez ${fmt(prev.weight_kg)} kg × ${prev.reps}${prev.rir !== null ? ` @ RIR ${prev.rir}` : ""}` : ""}
-        </p>
       </div>
 
-      {/* Series */}
-      <div className="flex flex-col">
-        <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
-          <span>SERIE</span>
-          <span>KG</span>
-          <span>REPS</span>
-          <span>RIR</span>
-          <span />
-        </div>
-
-        {exSets.map((s) => (
+      {members.map((m, mi) => {
+        const mSets = sets.filter((s) => s.exercise_id === m.id);
+        const mWork = mSets.filter((s) => s.kind !== "warmup").length;
+        const isActive = mi === activeSub;
+        const pair = members.length > 1;
+        return (
           <div
-            key={s.id}
-            className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center border-t border-line font-display text-[22px] font-semibold"
+            key={m.id}
+            className={
+              pair
+                ? `flex flex-col rounded-2xl p-3 ${isActive ? "bg-surface ring-1 ring-accent" : "bg-surface/50"}`
+                : "flex flex-col"
+            }
           >
-            <span className="font-sans text-sm text-muted">
-              {s.kind === "warmup" ? "C" : s.set_number}
-            </span>
-            <span className="tabular">{fmt(s.weight_kg)}</span>
-            <span className="tabular">{s.reps}</span>
-            <span className="tabular text-muted">{s.rir ?? "—"}</span>
-            <button
-              type="button"
-              aria-label={`Borrar serie ${s.set_number}`}
-              onClick={() => onDelete(s.id)}
-              className="flex h-11 items-center justify-center"
-            >
-              {s.is_pr ? (
-                <span className="rounded-full bg-warn px-1.5 font-sans text-[11px] font-bold text-bg">
-                  PR
-                </span>
-              ) : (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#cdf545" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M5 12l5 5 9-10" />
-                </svg>
-              )}
-            </button>
-          </div>
-        ))}
+            {pair && (
+              <button type="button" onClick={() => selectSub(mi)} className="mb-2 text-left">
+                <p className="text-xs font-semibold tracking-[0.08em] text-accent">
+                  {mi === 0 ? "PRIMERO" : "DESPUÉS"} · EJERCICIO {firstNumber + mi}
+                </p>
+                <p className="font-display text-[28px] font-bold leading-[1.05]">
+                  {m.ex.name}{" "}
+                  <span className="tabular text-base font-semibold text-muted">
+                    {mWork}/{item.target_sets}
+                  </span>
+                </p>
+                <p className="text-sm text-muted">{objective(m.id)}</p>
+              </button>
+            )}
 
-        {/* Fila activa */}
-        <div className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center rounded-[10px] bg-accent-dim font-display text-[22px] font-bold text-accent ring-1 ring-inset ring-accent">
-          <span className="pl-2 font-sans text-sm font-semibold">{warmup ? "C" : nextNumber}</span>
-          <span className="tabular">{weight || "—"}</span>
-          <span className="tabular">{reps || "—"}</span>
-          <span className="tabular">{warmup ? "—" : (rir ?? "—")}</span>
-          <span className="flex justify-center">
-            <span className="h-[18px] w-[18px] rounded-full border-2 border-accent" />
-          </span>
-        </div>
-      </div>
+            <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
+              <span>SERIE</span>
+              <span>KG</span>
+              <span>REPS</span>
+              <span>RIR</span>
+              <span />
+            </div>
+
+            {mSets.map((s) => (
+              <div
+                key={s.id}
+                className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center border-t border-line font-display text-[22px] font-semibold"
+              >
+                <span className="font-sans text-sm text-muted">
+                  {s.kind === "warmup" ? "C" : s.set_number}
+                </span>
+                <span className="tabular">{fmt(s.weight_kg)}</span>
+                <span className="tabular">{s.reps}</span>
+                <span className="tabular text-muted">{s.rir ?? "—"}</span>
+                <button
+                  type="button"
+                  aria-label={`Borrar serie ${s.set_number}`}
+                  onClick={() => onDelete(s.id)}
+                  className="flex h-11 items-center justify-center"
+                >
+                  {s.is_pr ? (
+                    <span className="rounded-full bg-warn px-1.5 font-sans text-[11px] font-bold text-bg">
+                      PR
+                    </span>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#cdf545" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12l5 5 9-10" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            ))}
+
+            {isActive && (
+              <div className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center rounded-[10px] bg-accent-dim font-display text-[22px] font-bold text-accent ring-1 ring-inset ring-accent">
+                <span className="pl-2 font-sans text-sm font-semibold">{warmup ? "C" : nextNumber}</span>
+                <span className="tabular">{weight || "—"}</span>
+                <span className="tabular">{reps || "—"}</span>
+                <span className="tabular">{warmup ? "—" : (rir ?? "—")}</span>
+                <span className="flex justify-center">
+                  <span className="h-[18px] w-[18px] rounded-full border-2 border-accent" />
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Descanso */}
       {resting && (
