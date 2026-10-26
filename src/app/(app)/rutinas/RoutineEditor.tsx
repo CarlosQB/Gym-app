@@ -15,6 +15,8 @@ const MUSCLES = [
   "Cuádriceps",
   "Isquiotibiales",
   "Glúteos",
+  "Aductores",
+  "Abductores",
   "Pantorrillas",
   "Abdomen",
   "Antebrazo",
