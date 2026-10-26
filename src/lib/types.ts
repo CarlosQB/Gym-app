@@ -4,6 +4,15 @@ export type Exercise = {
   muscle_group: string;
   equipment: string | null;
   notes?: string | null;
+  video_url?: string | null;
+};
+
+export type BodyMetric = {
+  id: string;
+  measured_on: string;
+  weight_kg: number | null;
+  waist_cm: number | null;
+  notes: string | null;
 };
 
 export type Routine = {

@@ -1,0 +1,16 @@
+export const MUSCLES = [
+  "Pecho",
+  "Espalda",
+  "Hombros",
+  "Bíceps",
+  "Tríceps",
+  "Cuádriceps",
+  "Isquiotibiales",
+  "Glúteos",
+  "Aductores",
+  "Abductores",
+  "Pantorrillas",
+  "Abdomen",
+  "Antebrazo",
+  "Otro",
+];

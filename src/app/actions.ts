@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { parseUnit } from "@/lib/units";
+import { fromDisplay, parseUnit } from "@/lib/units";
 import type { SetKind } from "@/lib/types";
 
 export async function setUnit(unit: string) {
@@ -170,6 +170,76 @@ export async function updateExerciseNote(exerciseId: string, note: string) {
     .update({ notes: note.trim() ? note.trim().slice(0, 500) : null })
     .eq("id", exerciseId);
   revalidatePath("/", "layout");
+}
+
+function cleanVideoUrl(raw: string): string | null | undefined {
+  const v = raw.trim();
+  if (!v) return null;
+  if (v.length > 300) return undefined;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function updateExercise(input: {
+  id: string;
+  muscleGroup?: string;
+  videoUrl?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const patch: Record<string, unknown> = {};
+  if (input.muscleGroup !== undefined) {
+    const g = input.muscleGroup.trim();
+    if (!g || g.length > 40) return { ok: false, error: "Grupo muscular inválido" };
+    patch.muscle_group = g;
+  }
+  if (input.videoUrl !== undefined) {
+    const url = cleanVideoUrl(input.videoUrl);
+    if (url === undefined) return { ok: false, error: "El enlace debe empezar con https://" };
+    patch.video_url = url;
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercises").update(patch).eq("id", input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function addBodyMetric(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const date = String(formData.get("date") ?? "");
+  const weightRaw = String(formData.get("weight") ?? "").replace(",", ".").trim();
+  const waistRaw = String(formData.get("waist") ?? "").replace(",", ".").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Fecha inválida" };
+
+  const unit = parseUnit((await cookies()).get("unit")?.value);
+  const weight = weightRaw ? Number(weightRaw) : null;
+  const waist = waistRaw ? Number(waistRaw) : null;
+  if (weight === null && waist === null) return { ok: false, error: "Captura el peso o la cintura" };
+  if (weight !== null && (!Number.isFinite(weight) || weight <= 0 || weight > 1000)) {
+    return { ok: false, error: "Peso inválido" };
+  }
+  if (waist !== null && (!Number.isFinite(waist) || waist <= 0 || waist > 400)) {
+    return { ok: false, error: "Cintura inválida" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("body_metrics").insert({
+    measured_on: date,
+    // El peso se guarda siempre en libras.
+    weight_kg: weight === null ? null : Math.round(fromDisplay(weight, unit) * 100) / 100,
+    waist_cm: waist,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/cuerpo");
+  return { ok: true };
+}
+
+export async function deleteBodyMetric(id: string) {
+  const supabase = await createClient();
+  await supabase.from("body_metrics").delete().eq("id", id);
+  revalidatePath("/cuerpo");
 }
 
 export async function deleteWorkout(workoutId: string) {
