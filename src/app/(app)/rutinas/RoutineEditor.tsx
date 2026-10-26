@@ -33,6 +33,10 @@ type Item = {
   rirMin: string;
   rirMax: string;
   restSeconds: string;
+  altId: string; // "" = sin alterno, NEW = crear, o id del catálogo
+  altNewName: string;
+  altMuscleGroup: string;
+  alternate: boolean;
 };
 
 const input =
@@ -54,6 +58,10 @@ function blank(): Item {
     rirMin: "1",
     rirMax: "2",
     restSeconds: "120",
+    altId: "",
+    altNewName: "",
+    altMuscleGroup: "Pecho",
+    alternate: false,
   };
 }
 
@@ -98,6 +106,10 @@ export function RoutineEditor({
             rirMin: String(it.rirMin),
             rirMax: String(it.rirMax),
             restSeconds: String(it.restSeconds),
+            altId: it.altExerciseId ?? "",
+            altNewName: "",
+            altMuscleGroup: "Pecho",
+            alternate: it.alternate,
           };
         })
       : [blank()],
@@ -133,6 +145,10 @@ export function RoutineEditor({
         rirMin: Number(it.rirMin),
         rirMax: Number(it.rirMax),
         restSeconds: Number(it.restSeconds),
+        altExerciseId: it.altId && it.altId !== NEW ? it.altId : null,
+        altNewName: it.altId === NEW ? it.altNewName : "",
+        altMuscleGroup: it.altMuscleGroup,
+        alternate: !!it.altId && it.alternate,
       })),
     };
     start(async () => {
@@ -266,6 +282,64 @@ export function RoutineEditor({
             <Num label="RIR MÍN" value={it.rirMin} onChange={(v) => patch(it.key, { rirMin: v })} />
             <Num label="RIR MÁX" value={it.rirMax} onChange={(v) => patch(it.key, { rirMax: v })} />
             <Num label="DESCANSO (s)" value={it.restSeconds} onChange={(v) => patch(it.key, { restSeconds: v })} />
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-xs font-medium tracking-[0.06em] text-muted">
+              EJERCICIO ALTERNO (OPCIONAL)
+            </p>
+            <select
+              aria-label="Ejercicio alterno"
+              value={it.altId}
+              onChange={(e) => patch(it.key, { altId: e.target.value })}
+              className={select}
+            >
+              <option value="">Sin alterno</option>
+              {catalog
+                .filter((ex) => ex.id !== it.exerciseId)
+                .map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} · {ex.muscle_group}
+                  </option>
+                ))}
+              <option value={NEW}>+ Ejercicio nuevo…</option>
+            </select>
+
+            {it.altId === NEW && (
+              <>
+                <input
+                  aria-label="Nombre del alterno nuevo"
+                  value={it.altNewName}
+                  onChange={(e) => patch(it.key, { altNewName: e.target.value })}
+                  placeholder="Nombre del ejercicio alterno"
+                  className="h-12 rounded-xl bg-surface-2 px-3 text-[16px] text-text outline-none"
+                />
+                <select
+                  aria-label="Grupo muscular del alterno"
+                  value={it.altMuscleGroup}
+                  onChange={(e) => patch(it.key, { altMuscleGroup: e.target.value })}
+                  className={select}
+                >
+                  {MUSCLES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {it.altId && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={it.alternate}
+                  onChange={(e) => patch(it.key, { alternate: e.target.checked })}
+                  className="h-5 w-5 accent-[#cdf545]"
+                />
+                Alternar uno y otro cada sesión
+              </label>
+            )}
           </div>
         </section>
       ))}

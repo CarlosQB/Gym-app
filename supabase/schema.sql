@@ -37,7 +37,10 @@ create table if not exists public.routine_exercises (
   rep_max smallint not null default 12,
   rir_min smallint not null default 1,
   rir_max smallint not null default 2,
-  rest_seconds smallint not null default 120
+  rest_seconds smallint not null default 120,
+  -- Ejercicio alterno (ver migrations/002); si alternate = true se turnan cada sesión
+  alt_exercise_id uuid references public.exercises(id) on delete set null,
+  alternate boolean not null default false
 );
 
 create table if not exists public.workouts (

@@ -10,7 +10,15 @@ type Props = {
   items: RoutineExercise[];
   sets: SetRow[];
   lastBest: Record<string, LastBest>;
+  initialAlt: Record<string, boolean>;
 };
+
+// Ejercicio que se está haciendo en este lugar de la rutina (principal o alterno).
+function pick(it: RoutineExercise, useAlt: boolean) {
+  return useAlt && it.alt_exercise && it.alt_exercise_id
+    ? { id: it.alt_exercise_id, ex: it.alt_exercise }
+    : { id: it.exercise_id, ex: it.exercise };
+}
 
 function fmt(n: number) {
   return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
@@ -77,14 +85,19 @@ function Stepper(props: {
   );
 }
 
-export function SessionView({ workout, items, sets, lastBest }: Props) {
+export function SessionView({ workout, items, sets, lastBest, initialAlt }: Props) {
   const [pending, startTransition] = useTransition();
+  const [alt, setAlt] = useState<Record<string, boolean>>(initialAlt);
 
   // Ejercicio inicial: el primero que aún no completa sus series objetivo.
   const initialIndex = useMemo(() => {
     const i = items.findIndex(
       (it) =>
-        sets.filter((s) => s.exercise_id === it.exercise_id && s.kind !== "warmup").length <
+        sets.filter(
+          (s) =>
+            (s.exercise_id === it.exercise_id || s.exercise_id === it.alt_exercise_id) &&
+            s.kind !== "warmup",
+        ).length <
         it.target_sets,
     );
     return i === -1 ? Math.max(0, items.length - 1) : i;
@@ -93,12 +106,13 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
   }, []);
 
   // Valores más útiles para precargar al entrar a un ejercicio.
-  function defaultsFor(i: number) {
+  function defaultsFor(i: number, map: Record<string, boolean> = alt) {
     const it = items[i];
     if (!it) return { weight: "20", reps: "10", rir: null as number | null };
-    const mine = sets.filter((s) => s.exercise_id === it.exercise_id);
+    const id = pick(it, !!map[it.id]).id;
+    const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
-    const best = lastBest[it.exercise_id];
+    const best = lastBest[id];
     return {
       weight: fmt(last?.weight_kg ?? best?.weight_kg ?? 20),
       reps: String(last?.reps ?? it.rep_max ?? 10),
@@ -115,13 +129,26 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
   const [prFlash, setPrFlash] = useState(false);
 
   const item = items[index];
-  const exSets = item ? sets.filter((s) => s.exercise_id === item.exercise_id) : [];
+  const active = item ? pick(item, !!alt[item.id]) : null;
+  const exSets = active ? sets.filter((s) => s.exercise_id === active.id) : [];
   const workingSets = exSets.filter((s) => s.kind !== "warmup");
-  const prev = item ? lastBest[item.exercise_id] : undefined;
+  const prev = active ? lastBest[active.id] : undefined;
 
   function goTo(i: number) {
     const d = defaultsFor(i);
     setIndex(i);
+    setWeight(d.weight);
+    setReps(d.reps);
+    setRir(d.rir);
+    setWarmup(false);
+    setError(null);
+  }
+
+  function swap() {
+    if (!item) return;
+    const next = { ...alt, [item.id]: !alt[item.id] };
+    setAlt(next);
+    const d = defaultsFor(index, next);
     setWeight(d.weight);
     setReps(d.reps);
     setRir(d.rir);
@@ -176,7 +203,7 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
     startTransition(async () => {
       const res = await saveSet({
         workoutId: workout.id,
-        exerciseId: item.exercise_id,
+        exerciseId: active!.id,
         kind: warmup ? "warmup" : "normal",
         weightKg: w,
         reps: r,
@@ -268,8 +295,17 @@ export function SessionView({ workout, items, sets, lastBest }: Props) {
           </div>
         </div>
         <h1 className="font-display text-[34px] font-bold leading-[1.05]">
-          {item.exercise.name}
+          {active!.ex.name}
         </h1>
+        {item.alt_exercise && (
+          <button
+            type="button"
+            onClick={swap}
+            className="mt-1 h-9 rounded-full bg-surface-2 px-3 text-[13px] font-semibold text-accent"
+          >
+            Cambiar a {alt[item.id] ? item.exercise.name : item.alt_exercise.name}
+          </button>
+        )}
         <p className="mt-1 text-sm text-muted">
           Objetivo {item.target_sets} × {item.rep_min}–{item.rep_max} · RIR {item.rir_min}–
           {item.rir_max}

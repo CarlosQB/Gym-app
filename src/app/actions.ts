@@ -160,6 +160,10 @@ export type RoutineItemInput = {
   rirMin: number;
   rirMax: number;
   restSeconds: number;
+  altExerciseId: string | null;
+  altNewName: string;
+  altMuscleGroup: string;
+  alternate: boolean;
 };
 
 export type RoutineInput = {
@@ -184,6 +188,9 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
     const n = i + 1;
     if (!it.exerciseId && !it.newName.trim()) {
       return { ok: false, error: `Ejercicio ${n}: elige uno o escribe el nombre` };
+    }
+    if (it.altExerciseId && it.altExerciseId === it.exerciseId) {
+      return { ok: false, error: `Ejercicio ${n}: el alterno debe ser distinto` };
     }
     if (
       !inRange(it.targetSets, 1, 20) ||
@@ -223,29 +230,43 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
   }
 
   // 2. Ejercicios nuevos (si el nombre ya existe se reutiliza)
-  const exerciseIds: string[] = [];
-  for (const it of input.items) {
-    if (it.exerciseId) {
-      exerciseIds.push(it.exerciseId);
-      continue;
-    }
-    const exName = it.newName.trim();
+  async function resolveExercise(
+    id: string | null,
+    newName: string,
+    muscle: string,
+  ): Promise<{ id: string } | { error: string }> {
+    if (id) return { id };
+    const exName = newName.trim();
     const { data: found } = await supabase
       .from("exercises")
       .select("id")
       .eq("name", exName)
       .maybeSingle();
-    if (found) {
-      exerciseIds.push(found.id);
-      continue;
-    }
+    if (found) return { id: found.id };
     const { data: created, error } = await supabase
       .from("exercises")
-      .insert({ name: exName, muscle_group: it.muscleGroup || "Otro" })
+      .insert({ name: exName, muscle_group: muscle || "Otro" })
       .select("id")
       .single();
-    if (error || !created) return { ok: false, error: error?.message ?? "No se pudo crear el ejercicio" };
-    exerciseIds.push(created.id);
+    if (error || !created) return { error: error?.message ?? "No se pudo crear el ejercicio" };
+    return { id: created.id };
+  }
+
+  const exerciseIds: string[] = [];
+  const altIds: (string | null)[] = [];
+  for (const it of input.items) {
+    const main = await resolveExercise(it.exerciseId, it.newName, it.muscleGroup);
+    if ("error" in main) return { ok: false, error: main.error };
+    exerciseIds.push(main.id);
+
+    if (it.altExerciseId || it.altNewName.trim()) {
+      const alt = await resolveExercise(it.altExerciseId, it.altNewName, it.altMuscleGroup);
+      if ("error" in alt) return { ok: false, error: alt.error };
+      if (alt.id === main.id) return { ok: false, error: "El alterno debe ser distinto al principal" };
+      altIds.push(alt.id);
+    } else {
+      altIds.push(null);
+    }
   }
 
   // 3. Se insertan las filas nuevas y después se borran las anteriores (no se pierde nada si falla).
@@ -265,6 +286,8 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
       rir_min: it.rirMin,
       rir_max: it.rirMax,
       rest_seconds: it.restSeconds,
+      alt_exercise_id: altIds[i],
+      alternate: altIds[i] ? it.alternate : false,
     })),
   );
   if (insErr) return { ok: false, error: insErr.message };

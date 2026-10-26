@@ -51,7 +51,7 @@ export default async function HoyPage() {
   if (todayRoutine) {
     const { data } = await supabase
       .from("routine_exercises")
-      .select("*, exercise:exercises(*)")
+      .select("*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)")
       .eq("routine_id", todayRoutine.id)
       .order("position");
     exercises = (data ?? []) as RoutineExercise[];
@@ -139,7 +139,12 @@ export default async function HoyPage() {
                 key={re.id}
                 className="flex h-[38px] items-center justify-between border-t border-line text-[15px]"
               >
-                <span>{re.exercise.name}</span>
+                <span>
+                  {re.exercise.name}
+                  {re.alt_exercise && (
+                    <span className="text-muted"> / {re.alt_exercise.name}</span>
+                  )}
+                </span>
                 <span className="tabular text-muted">
                   {re.target_sets} × {re.rep_min}–{re.rep_max}
                 </span>
