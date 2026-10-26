@@ -5,6 +5,8 @@ import Link from "next/link";
 import { deleteSet, finishWorkout, saveSet } from "@/app/actions";
 import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
+import { suggest } from "@/lib/progression";
+import { ExerciseNote, PlateCalc, SuggestionChip } from "@/components/SessionExtras";
 
 type Props = {
   workout: Workout;
@@ -160,6 +162,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const [reps, setReps] = useState(() => defaultsFor(initialIndex).reps);
   const [rir, setRir] = useState<number | null>(() => defaultsFor(initialIndex).rir);
   const [warmup, setWarmup] = useState(false);
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [prFlash, setPrFlash] = useState(false);
 
@@ -247,6 +250,22 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const restLeft = restEnd ? Math.max(0, (restEnd - now) / 1000) : 0;
   const resting = restEnd !== null && restLeft > 0;
 
+  // Recomendación para la primera serie de trabajo, según la vez pasada y el rango de la rutina.
+  const lastForActive = active ? lastBest[active.id] : undefined;
+  const lastShown = lastForActive
+    ? { weight: toDisplay(lastForActive.weight_kg, unit), reps: lastForActive.reps, rir: lastForActive.rir }
+    : undefined;
+  const suggestion =
+    active && exSets.filter((s) => s.kind === "normal").length === 0
+      ? suggest({
+          last: lastShown,
+          repMin: active.re.rep_min,
+          repMax: active.re.rep_max,
+          rirMax: active.re.rir_max,
+          step: stepFor(unit),
+        })
+      : null;
+
   if (!item) {
     return (
       <div className="flex flex-col gap-4">
@@ -278,6 +297,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     const kind = warmup ? "warmup" : "normal";
     const wasWarmup = warmup;
     const rest = active!.re.rest_seconds;
+    const setNoteText = note.trim() || null;
+    setNote("");
 
     startTransition(async () => {
       // Todo lo visible ocurre al instante, sin esperar al servidor.
@@ -312,6 +333,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
           reps: r,
           rir: wasWarmup ? null : rir,
           is_pr: false,
+          note: setNoteText,
           created_at: new Date().toISOString(),
         },
       });
@@ -322,6 +344,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         weightKg: w,
         reps: r,
         rir: wasWarmup ? null : rir,
+        note: setNoteText,
       });
       if (!res.ok) {
         setError(res.error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
@@ -468,6 +491,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
               </div>
             )}
 
+            <ExerciseNote key={m.id} exerciseId={m.id} initial={m.ex.notes ?? null} />
+
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
               <span>SERIE</span>
               <span>{unit.toUpperCase()}</span>
@@ -477,10 +502,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
             </div>
 
             {mSets.map((s) => (
-              <div
-                key={s.id}
-                className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center border-t border-line font-display text-[22px] font-semibold"
-              >
+              <div key={s.id} className="border-t border-line">
+              <div className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center font-display text-[22px] font-semibold">
                 <span className="font-sans text-sm text-muted">
                   {s.kind === "warmup" ? "C" : s.set_number}
                 </span>
@@ -503,6 +526,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
                     </svg>
                   )}
                 </button>
+              </div>
+              {s.note && <p className="pb-1.5 pl-11 text-xs text-muted">{s.note}</p>}
               </div>
             ))}
 
@@ -558,10 +583,25 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
 
       {/* Captura */}
       <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
+        {suggestion && active && (
+          <SuggestionChip
+            suggestion={suggestion}
+            last={lastShown}
+            targetSets={active.re.target_sets}
+            unit={unit}
+            onUse={(sg) => {
+              setWeight(fmt(sg.weight));
+              setReps(String(sg.reps));
+            }}
+          />
+        )}
+
         <div className="flex gap-3">
           <Stepper label={`PESO · ${unit.toUpperCase()}`} value={weight} step={stepFor(unit)} decimal onChange={setWeight} />
           <Stepper label="REPS" value={reps} step={1} onChange={setReps} />
         </div>
+
+        <PlateCalc weight={weight} unit={unit} />
 
         <div>
           <p className="mb-1.5 text-xs font-medium tracking-[0.06em] text-muted">
@@ -595,6 +635,15 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         >
           {warmup ? "Serie de calentamiento" : "Marcar como calentamiento"}
         </button>
+
+        <input
+          aria-label="Nota de esta serie"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={300}
+          placeholder="Nota de esta serie (opcional)"
+          className="h-11 rounded-xl bg-surface-2 px-3 text-sm text-text outline-none"
+        />
 
         {error && (
           <p role="alert" className="text-sm text-warn">

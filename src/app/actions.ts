@@ -63,6 +63,7 @@ export type SaveSetInput = {
   weightKg: number;
   reps: number;
   rir: number | null;
+  note?: string | null;
 };
 
 export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?: boolean; error?: string }> {
@@ -107,6 +108,8 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
     reps: input.reps,
     rir: input.rir,
     is_pr: isPr,
+    // Solo se envía si hay nota: así guardar sin notas sigue funcionando aunque falte la migración 004.
+    ...(input.note?.trim() ? { note: input.note.trim().slice(0, 300) } : {}),
   });
   if (error) return { ok: false, error: error.message };
 
@@ -131,6 +134,7 @@ export type UpdateSetInput = {
   weightKg: number;
   reps: number;
   rir: number | null;
+  note?: string | null;
 };
 
 export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; error?: string }> {
@@ -151,11 +155,21 @@ export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; e
     rir: input.rir,
   };
   if (input.kind !== "normal") patch.is_pr = false;
+  if (input.note !== undefined) patch.note = input.note?.trim() ? input.note.trim().slice(0, 300) : null;
   const { error } = await supabase.from("sets").update(patch).eq("id", input.setId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/historial/${input.workoutId}`);
   revalidatePath("/historial");
   return { ok: true };
+}
+
+export async function updateExerciseNote(exerciseId: string, note: string) {
+  const supabase = await createClient();
+  await supabase
+    .from("exercises")
+    .update({ notes: note.trim() ? note.trim().slice(0, 500) : null })
+    .eq("id", exerciseId);
+  revalidatePath("/", "layout");
 }
 
 export async function deleteWorkout(workoutId: string): Promise<{ ok: false; error: string }> {
