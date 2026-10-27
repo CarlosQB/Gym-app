@@ -218,6 +218,18 @@ export async function mergeExercises(
   return { ok: true };
 }
 
+export async function setExerciseImage(id: string, imageId: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (imageId !== null && !/^[\w\-]{1,120}$/.test(imageId)) return { ok: false, error: "Imagen no válida" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercises").update({ image_id: imageId }).eq("id", id);
+  if (error) {
+    const missing = error.code === "42703" || error.code === "PGRST204";
+    return { ok: false, error: missing ? "Falta correr la migración 007 en Supabase" : error.message };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function renameExercise(id: string, name: string): Promise<{ ok: boolean; error?: string }> {
   const clean = name.trim().replace(/\s+/g, " ");
   if (!clean) return { ok: false, error: "Escribe un nombre" };

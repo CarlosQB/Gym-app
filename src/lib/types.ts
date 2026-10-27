@@ -4,6 +4,7 @@ export type Exercise = {
   muscle_group: string;
   equipment: string | null;
   notes?: string | null;
+  image_id?: string | null;
 };
 
 export type Routine = {
