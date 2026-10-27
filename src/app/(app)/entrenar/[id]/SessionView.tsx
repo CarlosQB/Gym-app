@@ -148,6 +148,17 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
+    // Primera serie del ejercicio hoy: se precarga la recomendación (estimación) según la vez pasada.
+    if (!last && best) {
+      const sg = suggest({
+        last: { weight: toDisplay(best.weight_kg, unit), reps: best.reps, rir: best.rir },
+        repMin: it.rep_min,
+        repMax: it.rep_max,
+        rirMax: it.rir_max,
+        step: stepFor(unit),
+      });
+      if (sg) return { weight: fmt(sg.weight), reps: String(sg.reps), rir: it.rir_max as number | null };
+    }
     return {
       weight: fmt(
         last || best ? toDisplay(last?.weight_kg ?? best!.weight_kg, unit) : defaultWeight(unit),
