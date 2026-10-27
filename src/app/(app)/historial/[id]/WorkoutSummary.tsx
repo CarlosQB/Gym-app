@@ -1,29 +1,42 @@
 import { toDisplay, type Unit } from "@/lib/units";
+import { EditSets, type EditableSet } from "./EditSets";
 
-export type SummarySet = {
-  exerciseId: string;
-  name: string;
-  muscle: string;
-  kind: string;
-  weight_kg: number; // libras
-  reps: number;
-  rir: number | null;
-  is_pr: boolean;
-};
+export type SummarySet = EditableSet & { exerciseId: string; name: string; muscle: string };
 
 export type PrevSet = { exerciseId: string; workoutId: string; weight_kg: number; reps: number };
 
 const nf = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 });
 const epley = (w: number, r: number) => w * (1 + r / 30); // estimación
-const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
+const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "±");
+
+type Trend = "up" | "same" | "down";
+const trendOf = (w: number, r: number, pw: number, pr: number): Trend =>
+  w > pw || (w === pw && r > pr) ? "up" : w === pw && r === pr ? "same" : "down";
+const TREND = {
+  up: { icon: "▲", label: "mejor", cls: "text-accent" },
+  same: { icon: "=", label: "igual", cls: "text-muted" },
+  down: { icon: "▼", label: "menos", cls: "text-warn" },
+} as const;
+
+function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-xl bg-bg p-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="tabular font-display text-[26px] font-bold leading-tight">{value}</dd>
+      {hint && <dd className="text-xs text-muted">{hint}</dd>}
+    </div>
+  );
+}
 
 export function WorkoutSummary({
+  workoutId,
   sets,
   prev,
   minutes,
   unit,
 }: {
+  workoutId: string;
   sets: SummarySet[];
   prev: PrevSet[];
   minutes: number | null;
@@ -34,11 +47,9 @@ export function WorkoutSummary({
   const normal = work.filter((s) => s.kind === "normal");
   const effective = normal.filter((s) => s.rir !== null && s.rir <= 4).length; // estimación
   const volume = work.reduce((a, s) => a + s.weight_kg * s.reps, 0);
-  const reps = work.reduce((a, s) => a + s.reps, 0);
   const rirs = normal.filter((s) => s.rir !== null).map((s) => s.rir as number);
   const avgRir = rirs.length ? rirs.reduce((a, b) => a + b, 0) / rirs.length : null;
-  const toFailure = normal.filter((s) => s.rir === 0).length;
-  const prs = work.filter((s) => s.is_pr);
+  const prs = work.filter((s) => s.is_pr).length;
 
   // Orden de aparición de ejercicios.
   const order: string[] = [];
@@ -47,144 +58,178 @@ export function WorkoutSummary({
   const rows = order.map((id) => {
     const all = sets.filter((s) => s.exerciseId === id);
     const w = all.filter((s) => s.kind !== "warmup");
-    const warm = all.length - w.length;
+    const vol = w.reduce((a, s) => a + s.weight_kg * s.reps, 0);
+    const e1rm = w.reduce((m, s) => Math.max(m, epley(s.weight_kg, s.reps)), 0);
     const best = w.reduce<SummarySet | null>(
       (b, s) => (!b || s.weight_kg > b.weight_kg || (s.weight_kg === b.weight_kg && s.reps > b.reps) ? s : b),
       null,
     );
-    const vol = w.reduce((a, s) => a + s.weight_kg * s.reps, 0);
-    const e1rm = w.reduce((m, s) => Math.max(m, epley(s.weight_kg, s.reps)), 0);
 
-    // Última sesión anterior con este ejercicio.
+    // Última sesión anterior con este ejercicio, en el orden en que se hicieron las series.
     const p = prev.filter((x) => x.exerciseId === id);
     const lastWid = p[0]?.workoutId;
-    const pl = p.filter((x) => x.workoutId === lastWid);
+    const pl = p.filter((x) => x.workoutId === lastWid).reverse();
+    const pVol = pl.reduce((a, s) => a + s.weight_kg * s.reps, 0);
     const pBest = pl.reduce<PrevSet | null>(
       (b, s) => (!b || s.weight_kg > b.weight_kg || (s.weight_kg === b.weight_kg && s.reps > b.reps) ? s : b),
       null,
     );
-    const pVol = pl.reduce((a, s) => a + s.weight_kg * s.reps, 0);
-    return { id, name: all[0].name, muscle: all[0].muscle, w, warm, best, vol, e1rm, pBest, pVol, hasPrev: pl.length > 0 };
+    // Número de serie de trabajo (los calentamientos no cuentan) para comparar contra la misma serie de antes.
+    const workIdx = all.map((s) => (s.kind === "warmup" ? -1 : w.indexOf(s)));
+    const trend = best && pBest ? trendOf(best.weight_kg, best.reps, pBest.weight_kg, pBest.reps) : null;
+    return { id, name: all[0].name, muscle: all[0].muscle, all, workIdx, vol, e1rm, pl, pVol, trend };
   });
 
   const byMuscle = new Map<string, number>();
   for (const s of work) byMuscle.set(s.muscle, (byMuscle.get(s.muscle) ?? 0) + 1);
   const muscles = [...byMuscle.entries()].sort((a, b) => b[1] - a[1]);
-
-  const improved = rows.filter((r) => r.best && r.pBest && r.best.weight_kg > r.pBest.weight_kg);
-  const same = rows.filter((r) => r.best && r.pBest && r.best.weight_kg === r.pBest.weight_kg);
-  const lower = rows.filter((r) => r.best && r.pBest && r.best.weight_kg < r.pBest.weight_kg);
+  const maxMuscle = muscles[0]?.[1] ?? 1;
 
   return (
-    <section aria-labelledby="resumen" className="flex flex-col gap-4 rounded-2xl bg-surface p-4">
-      <h2 id="resumen" className="font-display text-2xl font-bold">
-        Resumen de la sesión
-      </h2>
+    <div className="flex flex-col gap-4">
+      <section aria-labelledby="resumen" className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
+        <h2 id="resumen" className="font-display text-2xl font-bold">
+          Resumen
+        </h2>
+        <dl className="grid grid-cols-2 gap-2">
+          <Tile label="Duración" value={minutes ? `${minutes} min` : "—"} hint={minutes ? undefined : "Sin terminar"} />
+          <Tile
+            label="Series de trabajo"
+            value={String(work.length)}
+            hint={sets.length > work.length ? `+ ${sets.length - work.length} de calentamiento` : undefined}
+          />
+          <Tile label={`Volumen (${unit})`} value={nf.format(d(volume))} />
+          <Tile
+            label="RIR promedio"
+            value={avgRir !== null ? n1.format(avgRir) : "—"}
+            hint={prs ? `★ ${prs} ${prs === 1 ? "récord" : "récords"}` : undefined}
+          />
+        </dl>
 
-      <p className="text-[15px] leading-relaxed">
-        {minutes ? `Entrenaste ${minutes} min` : "Sesión sin terminar"}: {rows.length} ejercicios,{" "}
-        <strong>{work.length} series de trabajo</strong>
-        {sets.length > work.length ? ` (más ${sets.length - work.length} de calentamiento)` : ""} y {reps} repeticiones,
-        con un volumen de <strong>{nf.format(d(volume))} {unit}</strong>
-        {prs.length ? `, y rompiste ${prs.length} ${prs.length === 1 ? "récord" : "récords"}` : ""}.
-        {avgRir !== null && (
-          <>
-            {" "}
-            Terminaste las series con un RIR promedio de {n1.format(avgRir)}
-            {toFailure ? ` y ${toFailure} ${toFailure === 1 ? "serie" : "series"} al fallo (RIR 0)` : ""}.
-          </>
+        {muscles.length > 0 && (
+          <div>
+            <h3 className="mb-1.5 text-sm font-semibold">Series por músculo</h3>
+            <ul className="flex flex-col gap-1.5">
+              {muscles.map(([m, n]) => (
+                <li key={m} className="grid grid-cols-[5.5rem_1fr_1.5rem] items-center gap-2 text-sm">
+                  <span className="truncate text-muted">{m}</span>
+                  <span className="h-3 rounded-full bg-bg" aria-hidden>
+                    <span className="block h-3 rounded-full bg-accent" style={{ width: `${(n / maxMuscle) * 100}%` }} />
+                  </span>
+                  <span className="tabular text-right">{n}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-xs text-muted">Series efectivas (normales con RIR ≤ 4): {effective} (estimación).</p>
+          </div>
         )}
-      </p>
+      </section>
 
-      {(improved.length > 0 || same.length > 0 || lower.length > 0) && (
-        <div className="text-sm">
-          <h3 className="mb-1 font-semibold">Contra tu sesión anterior</h3>
-          <ul className="flex flex-col gap-1 text-muted">
-            {improved.length > 0 && (
-              <li>
-                Subiste peso en: <span className="text-text">{improved.map((r) => r.name).join(", ")}</span>
-              </li>
+      {rows.map((r) => (
+        <section key={r.id} aria-labelledby={`ex-${r.id}`} className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
+          <header className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 id={`ex-${r.id}`} className="text-[17px] font-semibold leading-snug">
+                {r.name}
+              </h2>
+              <p className="text-xs text-muted">{r.muscle}</p>
+            </div>
+            {r.trend ? (
+              <span className={`shrink-0 rounded-full bg-bg px-2.5 py-1 text-xs font-semibold ${TREND[r.trend].cls}`}>
+                {TREND[r.trend].icon} {r.trend === "up" ? "Subiste" : r.trend === "same" ? "Igual" : "Bajaste"}
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-bg px-2.5 py-1 text-xs text-muted">Primera vez</span>
             )}
-            {same.length > 0 && (
-              <li>
-                Mismo peso máximo en: <span className="text-text">{same.map((r) => r.name).join(", ")}</span>
-              </li>
-            )}
-            {lower.length > 0 && (
-              <li>
-                Peso máximo menor en: <span className="text-text">{lower.map((r) => r.name).join(", ")}</span>
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
+          </header>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Por ejercicio</h3>
-        <ul className="flex flex-col gap-3">
-          {rows.map((r) => (
-            <li key={r.id} className="rounded-xl bg-bg p-3 text-sm">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="font-semibold">{r.name}</p>
-                <p className="text-xs text-muted">{r.muscle}</p>
-              </div>
-              <p className="mt-1 text-muted">
-                {r.w.length} {r.w.length === 1 ? "serie" : "series"} de trabajo
-                {r.warm ? ` + ${r.warm} calentamiento` : ""} · volumen {nf.format(d(r.vol))} {unit}
-              </p>
-              {r.best && (
-                <p className="text-muted">
-                  Mejor serie:{" "}
-                  <span className="text-text">
-                    {n1.format(d(r.best.weight_kg))} {unit} × {r.best.reps}
-                  </span>
-                  {r.best.rir !== null ? ` (RIR ${r.best.rir})` : ""} · 1RM est. {nf.format(d(r.e1rm))} {unit}
-                </p>
-              )}
-              <p className="text-muted">
-                Series:{" "}
-                {r.w.map((s, i) => (
-                  <span key={i}>
-                    {i > 0 ? " · " : ""}
-                    {n1.format(d(s.weight_kg))}×{s.reps}
-                    {s.rir !== null ? `@${s.rir}` : ""}
-                    {s.is_pr ? " ★" : ""}
-                  </span>
-                ))}
-              </p>
-              {r.hasPrev && r.best && r.pBest ? (
-                <p className="text-muted">
-                  Anterior: {n1.format(d(r.pBest.weight_kg))} {unit} × {r.pBest.reps}, volumen {nf.format(d(r.pVol))} {unit}
-                  {" → "}
-                  <span className="text-text">
-                    {sign(r.vol - r.pVol)}
-                    {nf.format(Math.abs(d(r.vol - r.pVol)))} {unit} de volumen
-                    {r.best.weight_kg !== r.pBest.weight_kg
-                      ? `, ${sign(r.best.weight_kg - r.pBest.weight_kg)}${n1.format(Math.abs(d(r.best.weight_kg - r.pBest.weight_kg)))} ${unit} en peso máx.`
-                      : ""}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-muted">Primera vez que registras este ejercicio.</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">Series de {r.name}, comparadas con la sesión anterior</caption>
+            <thead className="text-xs text-muted">
+              <tr>
+                <th scope="col" className="w-8 py-1 font-normal">
+                  #
+                </th>
+                <th scope="col" className="py-1 font-normal">
+                  Peso
+                </th>
+                <th scope="col" className="py-1 text-center font-normal">
+                  Reps
+                </th>
+                <th scope="col" className="py-1 text-center font-normal">
+                  RIR
+                </th>
+                <th scope="col" className="py-1 text-right font-normal">
+                  Antes
+                </th>
+              </tr>
+            </thead>
+            <tbody className="tabular">
+              {r.all.map((s, i) => {
+                const warm = s.kind === "warmup";
+                const idx = r.workIdx[i];
+                const p = idx >= 0 ? r.pl[idx] : undefined;
+                const t = p ? TREND[trendOf(s.weight_kg, s.reps, p.weight_kg, p.reps)] : null;
+                return (
+                  <tr key={s.id} className={`border-t border-line ${warm ? "text-muted" : ""}`}>
+                    <th scope="row" className="py-2 font-normal text-muted">
+                      {warm ? <abbr title="Calentamiento">C</abbr> : idx + 1}
+                      {s.kind === "dropset" && <abbr title="Dropset"> D</abbr>}
+                    </th>
+                    <td className="py-2 font-display text-lg font-bold">
+                      {n1.format(d(s.weight_kg))} <span className="text-xs font-normal text-muted">{unit}</span>
+                      {s.is_pr && (
+                        <span className="ml-1 text-accent" title="Récord de peso">
+                          ★<span className="sr-only"> récord</span>
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-center font-display text-lg font-bold">{s.reps}</td>
+                    <td className="py-2 text-center">{s.rir ?? "—"}</td>
+                    <td className="py-2 text-right">
+                      {p && t ? (
+                        <span className="whitespace-nowrap">
+                          <span className="text-muted">
+                            {n1.format(d(p.weight_kg))}×{p.reps}
+                          </span>{" "}
+                          <span className={t.cls} aria-label={t.label}>
+                            {t.icon}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-      {muscles.length > 0 && (
-        <div className="text-sm">
-          <h3 className="mb-1 font-semibold">Series por músculo</h3>
-          <p className="text-muted">
-            {muscles.map(([m, n]) => `${m}: ${n}`).join(" · ")}. Series efectivas (normales con RIR ≤ 4): {effective}.
+          <p className="text-xs text-muted">
+            Volumen {nf.format(d(r.vol))} {unit}
+            {r.pl.length > 0 && ` (${sign(r.vol - r.pVol)}${nf.format(Math.abs(d(r.vol - r.pVol)))} vs antes)`}
+            {r.e1rm > 0 && ` · 1RM est. ${nf.format(d(r.e1rm))} ${unit}`}
           </p>
-        </div>
-      )}
+
+          <details className="group rounded-xl bg-bg">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold">
+              Editar series
+              <span aria-hidden className="text-muted transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div className="px-3 pb-2">
+              <EditSets workoutId={workoutId} sets={r.all} unit={unit} />
+            </div>
+          </details>
+        </section>
+      ))}
 
       <p className="text-xs text-muted">
-        ★ = récord de peso. 1RM y series efectivas son estimaciones (fórmula de Epley; RIR ≤ 4). El calentamiento no
-        cuenta en series ni en volumen.
+        ▲ mejor que la vez pasada (más peso, o mismo peso con más reps) · ▼ menos · ★ récord. C = calentamiento, no
+        cuenta en series ni volumen. 1RM y series efectivas son estimaciones.
       </p>
-    </section>
+    </div>
   );
 }

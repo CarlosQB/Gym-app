@@ -30,10 +30,8 @@ export function suggest(opts: {
 }
 
 // Plan serie por serie (estimación): calentamientos y series de trabajo según la vez pasada.
-export type PlanStep = { kind: "warmup" | "normal"; weight: number; reps: number; generated?: boolean };
+export type PlanStep = { kind: "warmup" | "normal"; weight: number; reps: number };
 export type LastSet = { kind: string; weight: number; reps: number; rir: number | null };
-
-const roundTo = (n: number, step: number) => Math.max(step, Math.round(n / step) * step);
 
 export function planFor(opts: {
   lastSets: LastSet[];
@@ -61,18 +59,11 @@ export function planFor(opts: {
     );
   }
 
-  // Calentamientos: los mismos de la vez pasada; si no hubo, 50% × 10 y 75% × 5 del primer peso.
-  const lastWarm = lastSets.filter((s) => s.kind === "warmup");
+  // Calentamientos: solo si la vez pasada los registraste, con los mismos pesos y reps.
   const top = work[0].weight;
-  const warm: PlanStep[] =
-    lastWarm.length > 0
-      ? lastWarm.map((s) => ({ kind: "warmup", weight: Math.min(s.weight, top), reps: s.reps }))
-      : top >= step * 4
-        ? [
-            { kind: "warmup", weight: roundTo(top * 0.5, step), reps: 10, generated: true },
-            { kind: "warmup", weight: roundTo(top * 0.75, step), reps: 5, generated: true },
-          ]
-        : [];
+  const warm: PlanStep[] = lastSets
+    .filter((s) => s.kind === "warmup")
+    .map((s) => ({ kind: "warmup", weight: Math.min(s.weight, top), reps: s.reps }));
 
   return [...warm, ...work];
 }

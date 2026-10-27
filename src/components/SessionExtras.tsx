@@ -56,7 +56,6 @@ export function PlanCard({
               >
                 <span>
                   {isWarm ? "Calentamiento" : `Serie ${workNumber[i]}`}
-                  {st.generated ? " (sugerido)" : ""}
                 </span>
                 <span className="font-display text-base font-bold">{stepLabel(st, unit)}</span>
               </button>
@@ -85,9 +84,9 @@ export function NoHistoryChip({
   function link() {
     const old = history.find((h) => h.id === target);
     if (!old) return;
-    if (!window.confirm(`"${exercise.name}" y "${old.name}" son el mismo ejercicio. Se junta su historial y se queda el nombre "${old.name}". ¿Continuar?`)) return;
+    if (!window.confirm(`"${exercise.name}" y "${old.name}" son el mismo ejercicio. Se junta su historial y se queda el nombre de tu rutina, "${exercise.name}". ¿Continuar?`)) return;
     start(async () => {
-      const res = await mergeExercises(exercise.id, old.id);
+      const res = await mergeExercises(exercise.id, old.id, true);
       if (res.ok) onLinked();
       else setMsg(res.error ?? "No se pudo ligar.");
     });
