@@ -456,6 +456,10 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         );
       })}
 
+      <span className="sr-only" role="status" aria-live="polite">
+        {restEnd !== null && !resting ? "Descanso terminado" : ""}
+      </span>
+
       {/* Descanso */}
       {resting && (
         <div className="flex h-14 items-center gap-2.5 rounded-2xl bg-surface pl-4 pr-1.5">

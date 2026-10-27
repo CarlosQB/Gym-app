@@ -7,7 +7,7 @@ import "@fontsource/barlow-condensed/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gym",
+  title: { default: "Gym", template: "%s · Gym" },
   description: "Mi progreso en el gym: series, RIR, rutinas y avance.",
   manifest: "/manifest.webmanifest",
 };

@@ -10,6 +10,8 @@ type Row = {
   sets: { count: number }[];
 };
 
+export const metadata = { title: "Historial" };
+
 export default async function HistorialPage() {
   const supabase = await createClient();
   const { data } = await supabase

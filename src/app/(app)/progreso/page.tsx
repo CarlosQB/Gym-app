@@ -18,6 +18,8 @@ type PrRow = {
   exercise_id: string;
 };
 
+export const metadata = { title: "Progreso" };
+
 export default async function ProgresoPage() {
   const supabase = await createClient();
   const unit = await getUnit();

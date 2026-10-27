@@ -17,7 +17,7 @@ export function UnitToggle({ unit }: { unit: Unit }) {
             disabled={pending}
             aria-pressed={unit === u}
             onClick={() => unit !== u && start(() => setUnit(u))}
-            className={`h-9 rounded-full px-4 font-semibold ${
+            className={`h-11 rounded-full px-4 font-semibold ${
               unit === u ? "bg-accent text-bg" : "text-text"
             }`}
           >

@@ -200,7 +200,7 @@ export function RoutineEditor({
                 aria-label="Subir"
                 disabled={i === 0}
                 onClick={() => move(i, -1)}
-                className="h-9 w-9 rounded-lg bg-surface-2 disabled:opacity-30"
+                className="h-11 w-11 rounded-lg bg-surface-2 disabled:opacity-30"
               >
                 ↑
               </button>
@@ -209,7 +209,7 @@ export function RoutineEditor({
                 aria-label="Bajar"
                 disabled={i === items.length - 1}
                 onClick={() => move(i, 1)}
-                className="h-9 w-9 rounded-lg bg-surface-2 disabled:opacity-30"
+                className="h-11 w-11 rounded-lg bg-surface-2 disabled:opacity-30"
               >
                 ↓
               </button>
@@ -217,7 +217,7 @@ export function RoutineEditor({
                 type="button"
                 aria-label="Quitar ejercicio"
                 onClick={() => setItems((l) => l.filter((x) => x.key !== it.key))}
-                className="h-9 rounded-lg px-2 text-warn"
+                className="h-11 rounded-lg px-3 text-warn"
               >
                 Quitar
               </button>

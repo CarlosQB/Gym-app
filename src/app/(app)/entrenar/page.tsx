@@ -5,6 +5,8 @@ import type { Routine } from "@/lib/types";
 
 const WEEKDAYS = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
+export const metadata = { title: "Entrenar" };
+
 export default async function EntrenarPage() {
   const supabase = await createClient();
   const { data } = await supabase.from("routines").select("*").order("position");

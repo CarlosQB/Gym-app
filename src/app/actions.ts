@@ -117,7 +117,11 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
 export async function deleteSet(setId: string, workoutId: string) {
   const supabase = await createClient();
   await supabase.from("sets").delete().eq("id", setId);
+  // Antes solo se refrescaba la sesión en curso, por eso en el historial la serie "no se borraba".
   revalidatePath(`/entrenar/${workoutId}`);
+  revalidatePath(`/historial/${workoutId}`);
+  revalidatePath("/historial");
+  revalidatePath("/");
 }
 
 export type UpdateSetInput = {
@@ -154,12 +158,13 @@ export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
-export async function deleteWorkout(workoutId: string) {
+export async function deleteWorkout(workoutId: string): Promise<{ ok: false; error: string }> {
   const supabase = await createClient();
   // Las series se borran en cascada.
-  await supabase.from("workouts").delete().eq("id", workoutId);
-  revalidatePath("/");
-  revalidatePath("/historial");
+  const { data, error } = await supabase.from("workouts").delete().eq("id", workoutId).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "No se encontró la sesión para borrar." };
+  revalidatePath("/", "layout");
   redirect("/historial");
 }
 

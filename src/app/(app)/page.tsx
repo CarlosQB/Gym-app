@@ -17,6 +17,8 @@ import type { Routine, RoutineExercise } from "@/lib/types";
 
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 
+export const metadata = { title: "Hoy" };
+
 export default async function HoyPage() {
   const supabase = await createClient();
   const unit = await getUnit();
@@ -26,7 +28,9 @@ export default async function HoyPage() {
 
   const since = new Date(now.getTime() - 100 * 24 * 3600 * 1000).toISOString();
 
-  const [routinesRes, workoutsRes, lastRes, itemsRes] = await Promise.all([
+  const openSince = new Date(now.getTime() - 72 * 3600 * 1000).toISOString();
+
+  const [routinesRes, workoutsRes, lastRes, itemsRes, openRes] = await Promise.all([
     supabase.from("routines").select("*").order("position"),
     supabase
       .from("workouts")
@@ -44,6 +48,14 @@ export default async function HoyPage() {
       .from("routine_exercises")
       .select("*, exercise:exercises!exercise_id(*)")
       .order("position"),
+    supabase
+      .from("workouts")
+      .select("id, name, started_at, sets(count)")
+      .is("ended_at", null)
+      .gte("started_at", openSince)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const routines = (routinesRes.data ?? []) as Routine[];
@@ -79,6 +91,8 @@ export default async function HoyPage() {
   const last = lastRes.data as
     | { id: string; name: string; started_at: string; ended_at: string; sets: { count: number }[] }
     | null;
+
+  const open = openRes.data as { id: string; name: string; started_at: string; sets: { count: number }[] } | null;
 
   const userName = process.env.NEXT_PUBLIC_USER_NAME;
 
@@ -121,6 +135,27 @@ export default async function HoyPage() {
         </div>
         {plan && <p className="text-xs text-muted">Plan: {plan}</p>}
       </section>
+
+      {open && (
+        <section
+          aria-label="Sesión en curso"
+          className="flex flex-col gap-3 rounded-[20px] bg-accent-dim p-[18px] ring-1 ring-[#3a4020]"
+        >
+          <div>
+            <p className="text-xs font-semibold tracking-[0.08em] text-accent">SESIÓN A LA MITAD</p>
+            <p className="font-display text-[28px] font-bold leading-[1.1]">{open.name}</p>
+            <p className="text-sm text-muted">
+              Empezó {formatShort(new Date(open.started_at))} · {open.sets?.[0]?.count ?? 0} series guardadas
+            </p>
+          </div>
+          <Link
+            href={`/entrenar/${open.id}`}
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-accent text-lg font-semibold text-bg"
+          >
+            Continuar entrenamiento
+          </Link>
+        </section>
+      )}
 
       {todayRoutine ? (
         <section className="flex flex-col rounded-[20px] bg-surface p-[18px]">

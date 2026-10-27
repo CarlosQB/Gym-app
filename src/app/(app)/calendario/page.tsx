@@ -12,6 +12,8 @@ function shiftMonth(y: number, m: number, d: number) {
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+export const metadata = { title: "Calendario" };
+
 export default async function CalendarioPage(props: PageProps<"/calendario">) {
   const sp = await props.searchParams;
   const raw = typeof sp.m === "string" ? sp.m : "";

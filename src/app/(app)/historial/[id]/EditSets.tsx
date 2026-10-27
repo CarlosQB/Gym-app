@@ -58,7 +58,11 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
   function remove() {
     if (!window.confirm(`¿Borrar la serie ${n}?`)) return;
     start(async () => {
-      await deleteSet(s.id, workoutId);
+      try {
+        await deleteSet(s.id, workoutId);
+      } catch {
+        setMsg("No se pudo borrar. Revisa tu conexión.");
+      }
     });
   }
 
@@ -105,7 +109,7 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
           aria-label="Tipo de serie"
           value={kind}
           onChange={(e) => setKind(e.target.value as SetKind)}
-          className="h-10 rounded-xl bg-surface-2 px-2 text-sm text-text"
+          className="h-11 rounded-xl bg-surface-2 px-2 text-sm text-text"
         >
           {KINDS.map((k) => (
             <option key={k.value} value={k.value}>
@@ -120,7 +124,7 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
             type="button"
             disabled={pending}
             onClick={save}
-            className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-bg disabled:opacity-50"
+            className="h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-bg disabled:opacity-50"
           >
             Guardar
           </button>
@@ -129,7 +133,7 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
           type="button"
           disabled={pending}
           onClick={remove}
-          className="h-10 rounded-xl px-3 text-sm text-warn disabled:opacity-50"
+          className="h-11 rounded-xl px-3 text-sm text-warn disabled:opacity-50"
         >
           Borrar
         </button>
