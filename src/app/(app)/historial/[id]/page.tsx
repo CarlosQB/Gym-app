@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatDayMonth } from "@/lib/dates";
+import { formatDayMonth, minutesBetween } from "@/lib/dates";
 import { getUnit } from "@/lib/unit.server";
 import { EditSets, type EditableSet } from "./EditSets";
 import { DeleteWorkoutButton } from "./DeleteWorkoutButton";
+import { WorkoutSummary } from "./WorkoutSummary";
 
 type Row = EditableSet & { exercise: { name: string; muscle_group: string } | null };
 
@@ -49,6 +50,22 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
         </p>
         <h1 className="font-display text-[34px] font-bold leading-[1.1]">{workout.name}</h1>
       </header>
+
+      {groups.length > 0 && (
+        <WorkoutSummary
+          unit={unit}
+          exercises={groups.length}
+          minutes={workout.ended_at ? minutesBetween(workout.started_at, workout.ended_at) : null}
+          sets={rows.map((r) => ({
+            kind: r.kind,
+            weight_kg: Number(r.weight_kg),
+            reps: r.reps,
+            rir: r.rir,
+            is_pr: r.is_pr,
+            muscle: r.exercise?.muscle_group ?? "Otro",
+          }))}
+        />
+      )}
 
       {groups.length === 0 ? (
         <p className="text-muted">Esta sesión no tiene series.</p>

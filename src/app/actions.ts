@@ -333,7 +333,8 @@ export async function finishWorkout(workoutId: string) {
     .update({ ended_at: new Date().toISOString() })
     .eq("id", workoutId);
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/historial");
+  redirect(`/historial/${workoutId}`);
 }
 
 export async function signOut() {
