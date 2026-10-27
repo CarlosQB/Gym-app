@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { deleteSet, finishWorkout, saveSet } from "@/app/actions";
-import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import {
+  addLocalSet,
+  dropQueuedSave,
+  enqueue,
+  getDeleted,
+  getLocalSets,
+  getQueue,
+  markDeleted,
+  removeLocalSets,
+  snapshotStorage,
+  subscribeStorage,
+} from "@/lib/offline";
+import { FAILED_EVENT, SAVED_EVENT, flushQueue } from "@/lib/sync";
+import type { LastBest, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
 import { suggest } from "@/lib/progression";
 import { ExerciseNote, PlateCalc, SuggestionChip } from "@/components/SessionExtras";
+
+// Solo se llama desde manejadores de eventos (nunca durante el render).
+const nowMs = () => Date.now();
 
 type Props = {
   workout: Workout;
@@ -98,14 +114,25 @@ function Stepper(props: {
   );
 }
 
-type SetAction = { type: "add"; set: SetRow } | { type: "del"; id: string };
-
 export function SessionView({ workout, items, sets: serverSets, lastBest, unit }: Props) {
-  const [pending, startTransition] = useTransition();
-  // Las series se ven al instante; el servidor confirma en segundo plano.
-  const [sets, applyOptimistic] = useOptimistic(serverSets, (cur: SetRow[], a: SetAction) =>
-    a.type === "add" ? [...cur, a.set] : cur.filter((s) => s.id !== a.id),
-  );
+  const router = useRouter();
+  // Las series se guardan primero en el teléfono y se ven al instante, con o sin señal.
+  const localSnapshot = useSyncExternalStore(subscribeStorage, snapshotStorage, () => "");
+  const sets = useMemo(() => {
+    void localSnapshot; // se recalcula cuando cambia el almacenamiento local
+    const deleted = new Set(getDeleted());
+    const known = new Set(serverSets.map((s) => s.id));
+    const extra = getLocalSets(workout.id).filter((s) => !known.has(s.id));
+    return [...serverSets, ...extra].filter((s) => !deleted.has(s.id));
+  }, [serverSets, localSnapshot, workout.id]);
+
+  // Cuando el servidor ya trae una serie, se borra su copia local.
+  useEffect(() => {
+    removeLocalSets(serverSets.map((s) => s.id));
+  }, [serverSets]);
+
+  const [finishing, setFinishing] = useState(false);
+  const [finishedOffline, setFinishedOffline] = useState(false);
   const slots = useMemo(() => groupSlots(items), [items]);
   // Variante elegida por ejercicio de rutina (true = la variante). Arranca con la que ya tenga series.
   const [variant, setVariant] = useState<Record<string, boolean>>(() => {
@@ -165,6 +192,26 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [prFlash, setPrFlash] = useState(false);
+
+  // Resultado de la sincronización: PR conseguido o error del servidor.
+  useEffect(() => {
+    function onSaved(e: Event) {
+      if ((e as CustomEvent<{ isPr: boolean }>).detail.isPr) {
+        setPrFlash(true);
+        setTimeout(() => setPrFlash(false), 4000);
+      }
+    }
+    function onFailed(e: Event) {
+      const { op, error } = (e as CustomEvent<{ op: string; error?: string }>).detail;
+      if (op === "save") setError(error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
+    }
+    window.addEventListener(SAVED_EVENT, onSaved);
+    window.addEventListener(FAILED_EVENT, onFailed);
+    return () => {
+      window.removeEventListener(SAVED_EVENT, onSaved);
+      window.removeEventListener(FAILED_EVENT, onFailed);
+    };
+  }, []);
 
   const slot = slots[index];
   const members = (slot ?? []).map((re) => {
@@ -293,77 +340,93 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     }
     setError(null);
 
+    const id = crypto.randomUUID();
     const exerciseId = active!.id;
-    const kind = warmup ? "warmup" : "normal";
+    const kind: SetKind = warmup ? "warmup" : "normal";
     const wasWarmup = warmup;
+    const rir2 = wasWarmup ? null : rir;
     const rest = active!.re.rest_seconds;
     const setNoteText = note.trim() || null;
     setNote("");
 
-    startTransition(async () => {
-      // Todo lo visible ocurre al instante, sin esperar al servidor.
-      if (!wasWarmup) {
-        setRestTotal(rest);
-        setRestEnd(Date.now() + rest * 1000);
-        setNow(Date.now());
-      }
-      setWarmup(false);
-      if (!wasWarmup && members.length > 1) {
-        // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
-        for (let k = 1; k < members.length; k++) {
-          const j = (activeSub + k) % members.length;
-          const m = members[j];
-          const n = sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length;
-          if (n < m.re.target_sets) {
-            selectSub(j);
-            break;
-          }
+    // Se guarda en el teléfono y entra a la cola; se envía en orden en cuanto haya señal.
+    addLocalSet({
+      id,
+      workout_id: workout.id,
+      exercise_id: exerciseId,
+      set_number: nextNumber,
+      kind,
+      weight_kg: w,
+      reps: r,
+      rir: rir2,
+      is_pr: false,
+      note: setNoteText,
+      created_at: new Date().toISOString(),
+    });
+    enqueue({ op: "save", id, workoutId: workout.id, exerciseId, kind, weightKg: w, reps: r, rir: rir2, note: setNoteText });
+    void flushQueue().then((sent) => {
+      if (sent > 0) router.refresh();
+    });
+
+    if (!wasWarmup) {
+      setRestTotal(rest);
+      const t = nowMs();
+      setRestEnd(t + rest * 1000);
+      setNow(t);
+    }
+    setWarmup(false);
+    if (!wasWarmup && members.length > 1) {
+      // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
+      for (let k = 1; k < members.length; k++) {
+        const j = (activeSub + k) % members.length;
+        const m = members[j];
+        const n = sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length;
+        if (n < m.re.target_sets) {
+          selectSub(j);
+          break;
         }
       }
-
-      applyOptimistic({
-        type: "add",
-        set: {
-          id: `tmp-${Date.now()}`,
-          workout_id: workout.id,
-          exercise_id: exerciseId,
-          set_number: nextNumber,
-          kind,
-          weight_kg: w,
-          reps: r,
-          rir: wasWarmup ? null : rir,
-          is_pr: false,
-          note: setNoteText,
-          created_at: new Date().toISOString(),
-        },
-      });
-      const res = await saveSet({
-        workoutId: workout.id,
-        exerciseId,
-        kind,
-        weightKg: w,
-        reps: r,
-        rir: wasWarmup ? null : rir,
-        note: setNoteText,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
-        setRestEnd(null);
-        return;
-      }
-      if (res.isPr) {
-        setPrFlash(true);
-        setTimeout(() => setPrFlash(false), 4000);
-      }
-    });
+    }
   }
 
   function onDelete(id: string) {
     if (!window.confirm("¿Borrar esta serie?")) return;
-    startTransition(async () => {
-      applyOptimistic({ type: "del", id });
-      await deleteSet(id, workout.id);
-    });
+    markDeleted(id);
+    // Si nunca llegó al servidor, basta con quitarla de la cola.
+    if (dropQueuedSave(id)) {
+      removeLocalSets([id]);
+      return;
+    }
+    enqueue({ op: "del", id, workoutId: workout.id });
+    void flushQueue();
+  }
+
+  async function onFinish() {
+    setFinishing(true);
+    enqueue({ op: "finish", workoutId: workout.id, endedAt: new Date().toISOString() });
+    await flushQueue();
+    const stillQueued = getQueue().some((o) => o.op === "finish" && o.workoutId === workout.id);
+    if (stillQueued) {
+      // Sin señal: la sesión queda terminada en el teléfono y se envía cuando vuelva.
+      setFinishedOffline(true);
+      setFinishing(false);
+      return;
+    }
+    router.push(`/historial/${workout.id}`);
+  }
+
+  if (finishedOffline) {
+    return (
+      <div className="flex flex-col gap-4 pt-10 text-center">
+        <h1 className="font-display text-[34px] font-bold leading-[1.05]">Sesión terminada</h1>
+        <p className="text-muted">
+          Se guardó en tu teléfono y se enviará sola cuando vuelva la señal. Toca Ir a Hoy cuando ya tengas señal y no cierres sesión hasta que se envíe.
+        </p>
+        <Link href="/" className="mx-auto rounded-full bg-accent px-5 py-3 font-semibold text-bg">
+          Ir a Hoy
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -385,14 +448,14 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
             {clock(elapsed)}
           </p>
         </div>
-        <form action={finishWorkout.bind(null, workout.id)}>
-          <button
-            type="submit"
-            className="h-11 rounded-full border border-line px-4 text-[15px] font-semibold text-text"
-          >
-            Terminar
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={onFinish}
+          disabled={finishing}
+          className="h-11 rounded-full border border-line px-4 text-[15px] font-semibold text-text disabled:opacity-60"
+        >
+          Terminar
+        </button>
       </div>
 
       {/* Ejercicio */}
@@ -659,10 +722,9 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         <button
           type="button"
           onClick={onSave}
-          disabled={pending}
           className="h-14 rounded-2xl bg-accent text-lg font-semibold text-bg disabled:opacity-60"
         >
-          {pending ? "Guardando…" : warmup ? "Guardar calentamiento" : `Guardar serie ${nextNumber}`}
+          {warmup ? "Guardar calentamiento" : `Guardar serie ${nextNumber}`}
         </button>
 
         {done && index < slots.length - 1 && (

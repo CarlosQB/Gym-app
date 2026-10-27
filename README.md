@@ -47,6 +47,10 @@ Historial por ejercicio, Progreso y Calendario ya están implementados.
 - `src/proxy.ts` refresca la sesión y redirige a `/login`.
 - `supabase/schema.sql` tablas, RLS, vista de series por grupo muscular y `seed_defaults()`.
 
-## Siguiente (Fase 2)
+## Modo sin señal
 
-Modo offline para sesiones y más métricas corporales.
+La sesión de entrenamiento funciona sin señal: cada serie se guarda primero en el teléfono (localStorage) y se envía en orden a `/api/sync` en cuanto vuelve la conexión. Cada serie lleva un id generado en el teléfono, así que un reintento no la duplica. No hay service worker: la sesión se abre con señal (al llegar al gym) y de ahí se puede registrar sin red; recargar la página sin señal no funciona.
+
+## Siguiente
+
+Más métricas corporales (v3).
