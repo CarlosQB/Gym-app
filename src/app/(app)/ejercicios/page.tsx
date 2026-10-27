@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { MergeExercises, type ExerciseOption } from "./MergeExercises";
+import { RenameExercises } from "./RenameExercises";
 
 export const metadata = { title: "Ejercicios" };
 
@@ -23,9 +24,11 @@ export default async function EjerciciosPage() {
         <h1 className="font-display text-[38px] font-bold leading-[1.05]">Ejercicios</h1>
         <p className="mt-1 text-sm text-muted">
           Si el mismo ejercicio quedó con dos nombres, únelos: se junta su historial y la recomendación vuelve a salir.
+          Después puedes ponerle el nombre que quieras.
         </p>
       </header>
       <MergeExercises exercises={exercises} />
+      <RenameExercises exercises={exercises} />
     </div>
   );
 }

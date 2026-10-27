@@ -178,11 +178,16 @@ export async function updateExerciseNote(exerciseId: string, note: string) {
 }
 
 /** Une dos ejercicios repetidos: series y rutinas pasan a `toId` y `fromId` se borra. */
-export async function mergeExercises(fromId: string, toId: string): Promise<{ ok: boolean; error?: string }> {
+/** Une dos ejercicios. Con keepFromName, el que queda toma el nombre del que se borra. */
+export async function mergeExercises(
+  fromId: string,
+  toId: string,
+  keepFromName = false,
+): Promise<{ ok: boolean; error?: string }> {
   if (!fromId || !toId || fromId === toId) return { ok: false, error: "Elige dos ejercicios distintos" };
   const supabase = await createClient();
 
-  const { data: pair } = await supabase.from("exercises").select("id, notes").in("id", [fromId, toId]);
+  const { data: pair } = await supabase.from("exercises").select("id, name, notes").in("id", [fromId, toId]);
   if (!pair || pair.length !== 2) return { ok: false, error: "No se encontraron los ejercicios" };
 
   // Primero se mueve todo; el borrado va al final para no perder nada si algo falla.
@@ -205,6 +210,21 @@ export async function mergeExercises(fromId: string, toId: string): Promise<{ ok
   const { error } = await supabase.from("exercises").delete().eq("id", fromId);
   if (error) return { ok: false, error: error.message };
 
+  // El nombre se cambia después de borrar, porque el nombre es único por usuario.
+  const fromName = pair.find((e) => e.id === fromId)?.name;
+  if (keepFromName && fromName) await supabase.from("exercises").update({ name: fromName }).eq("id", toId);
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function renameExercise(id: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (!clean) return { ok: false, error: "Escribe un nombre" };
+  if (clean.length > 80) return { ok: false, error: "Máximo 80 caracteres" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercises").update({ name: clean }).eq("id", id);
+  if (error) return { ok: false, error: error.code === "23505" ? "Ya tienes un ejercicio con ese nombre" : error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }
