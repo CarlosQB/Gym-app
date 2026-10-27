@@ -1,52 +1,130 @@
 "use client";
 
-import { useState } from "react";
-import { updateExerciseNote } from "@/app/actions";
-import type { Suggestion } from "@/lib/progression";
+import { useState, useTransition } from "react";
+import { mergeExercises, updateExerciseNote } from "@/app/actions";
+import type { PlanStep } from "@/lib/progression";
 import type { Unit } from "@/lib/units";
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2))));
 
-export function SuggestionChip({
-  suggestion,
+const stepLabel = (st: { kind: string; weight: number; reps: number }, unit: Unit) =>
+  `${fmt(st.weight)} ${unit} × ${st.reps}`;
+
+/** Plan serie por serie (estimación) con lo de la vez pasada; marca la serie que toca. */
+export function PlanCard({
+  plan,
   last,
-  targetSets,
+  done,
   unit,
   onUse,
 }: {
-  suggestion: Suggestion;
-  last?: { weight: number; reps: number; rir: number | null };
-  targetSets: number;
+  plan: PlanStep[];
+  last: { kind: string; weight: number; reps: number }[];
+  done: number;
   unit: Unit;
-  onUse: (s: Suggestion) => void;
+  onUse: (s: PlanStep) => void;
 }) {
+  // Número de serie de trabajo de cada paso (los calentamientos no cuentan).
+  const workNumber = plan.map((_, i) => plan.slice(0, i + 1).filter((p) => p.kind !== "warmup").length);
   return (
-    <button
-      type="button"
-      onClick={() => onUse(suggestion)}
-      className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-accent-dim px-3 py-2 text-left ring-1 ring-[#3a4020]"
-    >
-      <span className="text-[13px]">
-        {last && (
-          <span className="block text-muted">
-            La vez pasada: {fmt(last.weight)} {unit} × {last.reps}
-            {last.rir !== null ? ` @ RIR ${last.rir}` : ""}
-          </span>
-        )}
-        <span className="font-semibold text-accent">
-          Hoy: {targetSets} {targetSets === 1 ? "serie" : "series"} de {fmt(suggestion.weight)} {unit} × {suggestion.reps}
-        </span>
-        <span className="block text-muted">{suggestion.text} (estimación)</span>
-      </span>
-      <span className="text-sm font-semibold text-accent">Usar</span>
-    </button>
+    <div className="flex flex-col gap-2 rounded-xl bg-accent-dim px-3 py-2.5 text-[13px] ring-1 ring-[#3a4020]">
+      {last.length > 0 && (
+        <p className="text-muted">
+          La vez pasada:{" "}
+          {last.map((s, i) => (
+            <span key={i}>
+              {i > 0 && " · "}
+              {s.kind === "warmup" ? "C " : ""}
+              {stepLabel(s, unit)}
+            </span>
+          ))}
+        </p>
+      )}
+      <p className="font-semibold text-accent">Hoy (recomendado · estimación)</p>
+      <ol className="flex flex-col gap-1">
+        {plan.map((st, i) => {
+          const isWarm = st.kind === "warmup";
+          const state = i < done ? "done" : i === done ? "now" : "next";
+          return (
+            <li key={i}>
+              <button
+                type="button"
+                onClick={() => onUse(st)}
+                className={`flex min-h-9 w-full items-center justify-between rounded-lg px-2 text-left ${
+                  state === "now" ? "bg-accent text-bg" : state === "done" ? "text-muted line-through" : "text-text"
+                }`}
+              >
+                <span>
+                  {isWarm ? "Calentamiento" : `Serie ${workNumber[i]}`}
+                  {st.generated ? " (sugerido)" : ""}
+                </span>
+                <span className="font-display text-base font-bold">{stepLabel(st, unit)}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
-export function NoHistoryChip() {
+/** Ejercicio sin historial: puede que antes lo registraras con otro nombre. */
+export function NoHistoryChip({
+  exercise,
+  history,
+  onLinked,
+}: {
+  exercise: { id: string; name: string };
+  history: { id: string; name: string; sets: number }[];
+  onLinked: () => void;
+}) {
+  const [target, setTarget] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function link() {
+    const old = history.find((h) => h.id === target);
+    if (!old) return;
+    if (!window.confirm(`"${exercise.name}" y "${old.name}" son el mismo ejercicio. Se junta su historial y se queda el nombre "${old.name}". ¿Continuar?`)) return;
+    start(async () => {
+      const res = await mergeExercises(exercise.id, old.id);
+      if (res.ok) onLinked();
+      else setMsg(res.error ?? "No se pudo ligar.");
+    });
+  }
+
   return (
-    <div className="rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-muted">
-      Primera vez con este ejercicio: aún no hay recomendación. La próxima sesión te diré qué peso y reps intentar.
+    <div className="flex flex-col gap-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] text-muted">
+      <p>Sin historial con este nombre, así que aún no hay recomendación.</p>
+      {history.length > 0 && (
+        <>
+          <p className="text-text">¿Antes lo registraste con otro nombre?</p>
+          <div className="flex gap-2">
+            <select
+              aria-label="Nombre anterior del ejercicio"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="h-11 min-w-0 flex-1 rounded-xl bg-surface px-2 text-text"
+            >
+              <option value="">Elige…</option>
+              {history.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} · {h.sets} series
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!target || pending}
+              onClick={link}
+              className="h-11 shrink-0 rounded-xl bg-accent px-3 font-semibold text-bg disabled:opacity-60"
+            >
+              {pending ? "…" : "Es el mismo"}
+            </button>
+          </div>
+        </>
+      )}
+      {msg && <p role="alert" className="text-warn">{msg}</p>}
     </div>
   );
 }
