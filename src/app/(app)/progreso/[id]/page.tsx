@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDayMonth } from "@/lib/dates";
 import { getUnit } from "@/lib/unit.server";
 import { toDisplay } from "@/lib/units";
-import { ExerciseChart, type Point } from "./ExerciseChart";
+import { ExerciseChartLazy as ExerciseChart } from "./ExerciseChartLazy";
+import type { Point } from "./ExerciseChart";
 
 type Row = {
   weight_kg: number;

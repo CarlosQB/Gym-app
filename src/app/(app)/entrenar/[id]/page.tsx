@@ -9,27 +9,24 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
   const supabase = await createClient();
   const unit = await getUnit();
 
-  const { data: workout } = await supabase
-    .from("workouts")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (!workout) notFound();
-
-  const w = workout as Workout;
-
-  const [itemsRes, setsRes] = await Promise.all([
-    w.routine_id
-      ? supabase
-          .from("routine_exercises")
-          .select("*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)")
-          .eq("routine_id", w.routine_id)
-          .order("position")
-      : Promise.resolve({ data: [] }),
+  // Una sola ronda: la sesión con los ejercicios de su rutina, y sus series, en paralelo.
+  const [workoutRes, setsRes] = await Promise.all([
+    supabase
+      .from("workouts")
+      .select(
+        "*, routine:routines(routine_exercises(*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)))",
+      )
+      .eq("id", id)
+      .maybeSingle(),
     supabase.from("sets").select("*").eq("workout_id", id).order("created_at"),
   ]);
+  if (!workoutRes.data) notFound();
 
-  const items = (itemsRes.data ?? []) as RoutineExercise[];
+  const { routine, ...workout } = workoutRes.data as unknown as Workout & {
+    routine: { routine_exercises: RoutineExercise[] } | null;
+  };
+  const w = workout as Workout;
+  const items = [...(routine?.routine_exercises ?? [])].sort((x, y) => x.position - y.position);
   const sets = (setsRes.data ?? []) as SetRow[];
 
   // Mejor serie de la sesión anterior de cada ejercicio (para superarla).

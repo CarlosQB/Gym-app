@@ -99,7 +99,7 @@ begin
     execute format('drop policy if exists "own rows" on public.%I', t);
     execute format(
       'create policy "own rows" on public.%I for all to authenticated
-         using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+         using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))', t);
   end loop;
 end $$;
 
