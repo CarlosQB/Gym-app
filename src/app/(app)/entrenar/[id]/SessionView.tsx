@@ -16,10 +16,10 @@ import {
   subscribeStorage,
 } from "@/lib/offline";
 import { FAILED_EVENT, SAVED_EVENT, flushQueue } from "@/lib/sync";
-import type { LastBest, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
+import type { LastBest, LastSetRow, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
-import { suggest } from "@/lib/progression";
-import { ExerciseNote, NoHistoryChip, PlateCalc, SuggestionChip } from "@/components/SessionExtras";
+import { planFor, type PlanStep } from "@/lib/progression";
+import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
 
 // Solo se llama desde manejadores de eventos (nunca durante el render).
 const nowMs = () => Date.now();
@@ -29,6 +29,8 @@ type Props = {
   items: RoutineExercise[];
   sets: SetRow[];
   lastBest: Record<string, LastBest>;
+  lastSets: Record<string, LastSetRow[]>;
+  history: { id: string; name: string; sets: number }[];
   unit: Unit;
 };
 
@@ -114,7 +116,7 @@ function Stepper(props: {
   );
 }
 
-export function SessionView({ workout, items, sets: serverSets, lastBest, unit }: Props) {
+export function SessionView({ workout, items, sets: serverSets, lastBest, lastSets, history, unit }: Props) {
   const router = useRouter();
   // Las series se guardan primero en el teléfono y se ven al instante, con o sin señal.
   const localSnapshot = useSyncExternalStore(subscribeStorage, snapshotStorage, () => "");
@@ -166,32 +168,44 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Valores más útiles para precargar al entrar a un ejercicio.
+  // Plan serie por serie (calentamientos y trabajo) según la vez pasada de ese ejercicio.
+  function planOf(exerciseId: string, it: RoutineExercise): PlanStep[] {
+    return planFor({
+      lastSets: (lastSets[exerciseId] ?? []).map((x) => ({
+        kind: x.kind,
+        weight: toDisplay(x.weight_kg, unit),
+        reps: x.reps,
+        rir: x.rir,
+      })),
+      targetSets: it.target_sets,
+      repMin: it.rep_min,
+      repMax: it.rep_max,
+      rirMax: it.rir_max,
+      step: stepFor(unit),
+    });
+  }
+
+  // Valores para precargar: el paso del plan que toca; si no hay plan, la última serie.
   function defaultsFor(i: number, subIdx = 0, map: Record<string, boolean> = variant) {
     const slot = slots[i];
-    if (!slot) return { weight: String(defaultWeight(unit)), reps: "10", rir: null as number | null };
+    if (!slot) return { weight: String(defaultWeight(unit)), reps: "10", rir: null as number | null, warmup: false };
     const it = slot[subIdx] ?? slot[0];
     const id = pickEx(it, !!map[it.id]).id;
     const mine = sets.filter((s) => s.exercise_id === id);
+    const step = planOf(id, it)[mine.length];
+    if (step) {
+      const isWarm = step.kind === "warmup";
+      return { weight: fmt(step.weight), reps: String(step.reps), rir: isWarm ? null : (it.rir_max as number | null), warmup: isWarm };
+    }
     const last = mine[mine.length - 1];
     const best = lastBest[id];
-    // Primera serie del ejercicio hoy: se precarga la recomendación (estimación) según la vez pasada.
-    if (!last && best) {
-      const sg = suggest({
-        last: { weight: toDisplay(best.weight_kg, unit), reps: best.reps, rir: best.rir },
-        repMin: it.rep_min,
-        repMax: it.rep_max,
-        rirMax: it.rir_max,
-        step: stepFor(unit),
-      });
-      if (sg) return { weight: fmt(sg.weight), reps: String(sg.reps), rir: it.rir_max as number | null };
-    }
     return {
       weight: fmt(
         last || best ? toDisplay(last?.weight_kg ?? best!.weight_kg, unit) : defaultWeight(unit),
       ),
       reps: String(last?.reps ?? it.rep_max ?? 10),
       rir: (last?.rir ?? it.rir_max) as number | null,
+      warmup: false,
     };
   }
 
@@ -199,7 +213,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const [weight, setWeight] = useState(() => defaultsFor(initialIndex).weight);
   const [reps, setReps] = useState(() => defaultsFor(initialIndex).reps);
   const [rir, setRir] = useState<number | null>(() => defaultsFor(initialIndex).rir);
-  const [warmup, setWarmup] = useState(false);
+  const [warmup, setWarmup] = useState(() => defaultsFor(initialIndex).warmup);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [prFlash, setPrFlash] = useState(false);
@@ -240,7 +254,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     setWeight(d.weight);
     setReps(d.reps);
     setRir(d.rir);
-    setWarmup(false);
+    setWarmup(d.warmup);
     setError(null);
   }
 
@@ -251,7 +265,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     setWeight(d.weight);
     setReps(d.reps);
     setRir(d.rir);
-    setWarmup(false);
+    setWarmup(d.warmup);
     setError(null);
   }
 
@@ -273,7 +287,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
       setWeight(d.weight);
       setReps(d.reps);
       setRir(d.rir);
-      setWarmup(false);
+      setWarmup(d.warmup);
       setError(null);
     }
   }
@@ -308,21 +322,12 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const restLeft = restEnd ? Math.max(0, (restEnd - now) / 1000) : 0;
   const resting = restEnd !== null && restLeft > 0;
 
-  // Recomendación para la primera serie de trabajo, según la vez pasada y el rango de la rutina.
+  // Plan del ejercicio activo y la vez pasada, para mostrarlos.
   const lastForActive = active ? lastBest[active.id] : undefined;
-  const lastShown = lastForActive
-    ? { weight: toDisplay(lastForActive.weight_kg, unit), reps: lastForActive.reps, rir: lastForActive.rir }
-    : undefined;
-  const suggestion =
-    active && exSets.filter((s) => s.kind === "normal").length === 0
-      ? suggest({
-          last: lastShown,
-          repMin: active.re.rep_min,
-          repMax: active.re.rep_max,
-          rirMax: active.re.rir_max,
-          step: stepFor(unit),
-        })
-      : null;
+  const activePlan = active ? planOf(active.id, active.re) : [];
+  const activeLast = active
+    ? (lastSets[active.id] ?? []).map((x) => ({ kind: x.kind, weight: toDisplay(x.weight_kg, unit), reps: x.reps }))
+    : [];
 
   if (!item) {
     return (
@@ -385,7 +390,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
       setRestEnd(t + rest * 1000);
       setNow(t);
     }
-    setWarmup(false);
+    let switched = false;
     if (!wasWarmup && members.length > 1) {
       // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
       for (let k = 1; k < members.length; k++) {
@@ -394,8 +399,22 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         const n = sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length;
         if (n < m.re.target_sets) {
           selectSub(j);
+          switched = true;
           break;
         }
+      }
+    }
+    if (!switched) {
+      // Mismo ejercicio: se precarga el siguiente paso del plan (si lo hay).
+      const nextStep = planOf(exerciseId, active!.re)[exSets.length + 1];
+      if (nextStep) {
+        const isWarm = nextStep.kind === "warmup";
+        setWeight(fmt(nextStep.weight));
+        setReps(String(nextStep.reps));
+        setRir(isWarm ? null : active!.re.rir_max);
+        setWarmup(isWarm);
+      } else {
+        setWarmup(false);
       }
     }
   }
@@ -657,19 +676,24 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
 
       {/* Captura */}
       <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
-        {!suggestion && active && !lastForActive && exSets.filter((s) => s.kind === "normal").length === 0 && (
-          <NoHistoryChip />
+        {active && activePlan.length === 0 && !lastForActive && exSets.filter((s) => s.kind === "normal").length === 0 && (
+          <NoHistoryChip
+            exercise={{ id: active.id, name: active.ex.name }}
+            history={history.filter((h) => h.id !== active.id)}
+            onLinked={() => router.refresh()}
+          />
         )}
 
-        {suggestion && active && (
-          <SuggestionChip
-            suggestion={suggestion}
-            last={lastShown}
-            targetSets={active.re.target_sets}
+        {active && activePlan.length > 0 && (
+          <PlanCard
+            plan={activePlan}
+            last={activeLast}
+            done={exSets.length}
             unit={unit}
-            onUse={(sg) => {
-              setWeight(fmt(sg.weight));
-              setReps(String(sg.reps));
+            onUse={(st) => {
+              setWeight(fmt(st.weight));
+              setReps(String(st.reps));
+              setWarmup(st.kind === "warmup");
             }}
           />
         )}
