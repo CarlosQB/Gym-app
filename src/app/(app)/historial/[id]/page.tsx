@@ -5,7 +5,7 @@ import { formatDayMonth, minutesBetween } from "@/lib/dates";
 import { getUnit } from "@/lib/unit.server";
 import { EditSets, type EditableSet } from "./EditSets";
 import { DeleteWorkoutButton } from "./DeleteWorkoutButton";
-import { WorkoutSummary } from "./WorkoutSummary";
+import { WorkoutSummary, type PrevSet } from "./WorkoutSummary";
 
 type Row = EditableSet & { exercise: { name: string; muscle_group: string } | null };
 
@@ -27,6 +27,27 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
     .eq("workout_id", id)
     .order("created_at");
   const rows = (data ?? []) as unknown as Row[];
+
+  // Sesiones anteriores de los mismos ejercicios, para comparar.
+  const exIds = [...new Set(rows.map((r) => r.exercise_id))];
+  let prev: PrevSet[] = [];
+  if (exIds.length > 0) {
+    const { data: p } = await supabase
+      .from("sets")
+      .select("exercise_id, workout_id, weight_kg, reps")
+      .in("exercise_id", exIds)
+      .eq("kind", "normal")
+      .neq("workout_id", id)
+      .lt("created_at", workout.started_at)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    prev = (p ?? []).map((x) => ({
+      exerciseId: x.exercise_id as string,
+      workoutId: x.workout_id as string,
+      weight_kg: Number(x.weight_kg),
+      reps: x.reps as number,
+    }));
+  }
 
   const groups: { exerciseId: string; name: string; sets: EditableSet[] }[] = [];
   for (const r of rows) {
@@ -54,15 +75,17 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
       {groups.length > 0 && (
         <WorkoutSummary
           unit={unit}
-          exercises={groups.length}
           minutes={workout.ended_at ? minutesBetween(workout.started_at, workout.ended_at) : null}
+          prev={prev}
           sets={rows.map((r) => ({
+            exerciseId: r.exercise_id,
+            name: r.exercise?.name ?? "Ejercicio",
+            muscle: r.exercise?.muscle_group ?? "Otro",
             kind: r.kind,
             weight_kg: Number(r.weight_kg),
             reps: r.reps,
             rir: r.rir,
             is_pr: r.is_pr,
-            muscle: r.exercise?.muscle_group ?? "Otro",
           }))}
         />
       )}
