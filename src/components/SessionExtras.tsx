@@ -43,6 +43,14 @@ export function SuggestionChip({
   );
 }
 
+export function NoHistoryChip() {
+  return (
+    <div className="rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-muted">
+      Primera vez con este ejercicio: aún no hay recomendación. La próxima sesión te diré qué peso y reps intentar.
+    </div>
+  );
+}
+
 const PLATES: Record<Unit, number[]> = {
   lb: [45, 35, 25, 10, 5, 2.5],
   kg: [25, 20, 15, 10, 5, 2.5, 1.25],
@@ -71,14 +79,31 @@ export function PlateCalc({ weight, unit }: { weight: string; unit: Unit }) {
           rest -= n * p;
         }
       }
+      const perSide = (total - barWeight) / 2;
       content = (
-        <div className="flex flex-col gap-1 text-sm">
-          <p>
-            <span className="text-muted">Por lado: </span>
-            <span className="font-semibold">
-              {used.length === 0 ? "solo la barra" : used.map(([p, n]) => (n > 1 ? `${n}×${fmt(p)}` : fmt(p))).join(" + ")}
-            </span>
-          </p>
+        <div className="flex flex-col gap-2 text-sm">
+          {used.length === 0 ? (
+            <p className="font-semibold">Solo la barra, sin discos.</p>
+          ) : (
+            <>
+              <p className="text-muted">En cada lado de la barra pon:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {used.flatMap(([p, n]) =>
+                  Array.from({ length: n }, (_, k) => (
+                    <span
+                      key={`${p}-${k}`}
+                      className="rounded-lg bg-accent px-2.5 py-1 font-display text-base font-bold text-bg"
+                    >
+                      {fmt(p)} {unit}
+                    </span>
+                  )),
+                )}
+              </div>
+              <p className="text-muted">
+                Barra {fmt(barWeight)} + {fmt(perSide)} por lado × 2 = {fmt(total)} {unit}
+              </p>
+            </>
+          )}
           {rest > 0.01 && (
             <p className="text-warn">
               Con discos estándar faltan {fmt(Math.round(rest * 100) / 100)} {unit} por lado.
@@ -97,12 +122,12 @@ export function PlateCalc({ weight, unit }: { weight: string; unit: Unit }) {
         onClick={() => setOpen((v) => !v)}
         className="h-11 rounded-xl bg-surface-2 text-sm font-semibold text-muted"
       >
-        {open ? "Ocultar discos" : "Calcular discos"}
+        {open ? "Ocultar discos" : "¿Qué discos pongo?"}
       </button>
       {open && (
         <div className="flex flex-col gap-2 rounded-xl bg-surface-2 p-3">
           <label className="flex items-center gap-2 text-sm text-muted">
-            Barra
+            Peso de la barra
             <select
               value={barWeight}
               onChange={(e) => setBar((b) => ({ ...b, [unit]: Number(e.target.value) }))}
