@@ -4,6 +4,7 @@ import { getUnit } from "@/lib/unit.server";
 import { UnitToggle } from "@/components/UnitToggle";
 import { seedDefaults, startWorkout } from "@/app/actions";
 import { SignOutForm } from "@/components/SignOutForm";
+import { DuplicatePrompt } from "@/components/DuplicatePrompt";
 import {
   addDays,
   formatLong,
@@ -31,7 +32,7 @@ export default async function HoyPage() {
 
   const openSince = new Date(now.getTime() - 72 * 3600 * 1000).toISOString();
 
-  const [routinesRes, workoutsRes, lastRes, itemsRes, openRes] = await Promise.all([
+  const [routinesRes, workoutsRes, lastRes, itemsRes, openRes, exercisesRes] = await Promise.all([
     supabase.from("routines").select("*").order("position"),
     supabase
       .from("workouts")
@@ -57,6 +58,7 @@ export default async function HoyPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase.from("exercises").select("id, name, sets(count)"),
   ]);
 
   const routines = (routinesRes.data ?? []) as Routine[];
@@ -95,6 +97,10 @@ export default async function HoyPage() {
 
   const open = openRes.data as { id: string; name: string; started_at: string; sets: { count: number }[] } | null;
 
+  const allExercises = ((exercisesRes.data ?? []) as { id: string; name: string; sets: { count: number }[] }[]).map(
+    (e) => ({ id: e.id, name: e.name, sets: e.sets?.[0]?.count ?? 0 }),
+  );
+
   const userName = process.env.NEXT_PUBLIC_USER_NAME;
 
   return (
@@ -112,6 +118,8 @@ export default async function HoyPage() {
           </span>
         )}
       </header>
+
+      <DuplicatePrompt exercises={allExercises} />
 
       <section aria-label="Semana" className="flex flex-col gap-2">
         <div className="flex justify-between">
