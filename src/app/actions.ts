@@ -57,12 +57,15 @@ export async function startWorkout(routineId: string) {
 }
 
 export type SaveSetInput = {
+  /** Id generado en el teléfono: permite reintentar sin duplicar la serie. */
+  id?: string;
   workoutId: string;
   exerciseId: string;
   kind: SetKind;
   weightKg: number;
   reps: number;
   rir: number | null;
+  note?: string | null;
 };
 
 export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?: boolean; error?: string }> {
@@ -99,6 +102,7 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
   const isPr = input.kind === "normal" && !!prev && input.weightKg > Number(prev.weight_kg);
 
   const { error } = await supabase.from("sets").insert({
+    ...(input.id ? { id: input.id } : {}),
     workout_id: input.workoutId,
     exercise_id: input.exerciseId,
     set_number: (count ?? 0) + 1,
@@ -107,7 +111,11 @@ export async function saveSet(input: SaveSetInput): Promise<{ ok: boolean; isPr?
     reps: input.reps,
     rir: input.rir,
     is_pr: isPr,
+    // Solo se envía si hay nota: así guardar sin notas sigue funcionando aunque falte la migración 004.
+    ...(input.note?.trim() ? { note: input.note.trim().slice(0, 300) } : {}),
   });
+  // 23505 = ya existía (se reintentó una serie que sí había llegado): se da por buena.
+  if (error?.code === "23505") return { ok: true, isPr: false };
   if (error) return { ok: false, error: error.message };
 
   revalidatePath(`/entrenar/${input.workoutId}`);
@@ -131,6 +139,7 @@ export type UpdateSetInput = {
   weightKg: number;
   reps: number;
   rir: number | null;
+  note?: string | null;
 };
 
 export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; error?: string }> {
@@ -151,11 +160,21 @@ export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; e
     rir: input.rir,
   };
   if (input.kind !== "normal") patch.is_pr = false;
+  if (input.note !== undefined) patch.note = input.note?.trim() ? input.note.trim().slice(0, 300) : null;
   const { error } = await supabase.from("sets").update(patch).eq("id", input.setId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/historial/${input.workoutId}`);
   revalidatePath("/historial");
   return { ok: true };
+}
+
+export async function updateExerciseNote(exerciseId: string, note: string) {
+  const supabase = await createClient();
+  await supabase
+    .from("exercises")
+    .update({ notes: note.trim() ? note.trim().slice(0, 500) : null })
+    .eq("id", exerciseId);
+  revalidatePath("/", "layout");
 }
 
 export async function deleteWorkout(workoutId: string): Promise<{ ok: false; error: string }> {
@@ -335,6 +354,19 @@ export async function finishWorkout(workoutId: string) {
   revalidatePath("/");
   revalidatePath("/historial");
   redirect(`/historial/${workoutId}`);
+}
+
+// Igual que finishWorkout pero sin redirigir: lo usa la sincronización de la cola local.
+export async function syncFinish(workoutId: string, endedAt: string) {
+  const supabase = await createClient();
+  const when = new Date(endedAt);
+  await supabase
+    .from("workouts")
+    .update({ ended_at: Number.isNaN(when.getTime()) ? new Date().toISOString() : when.toISOString() })
+    .eq("id", workoutId)
+    .is("ended_at", null);
+  revalidatePath("/");
+  revalidatePath("/historial");
 }
 
 export async function signOut() {

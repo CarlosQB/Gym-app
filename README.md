@@ -8,6 +8,7 @@ App personal para llevar el progreso en el gym: series, peso (en libras), reps, 
 - **Hoy**: rutina del día, semana, racha y última sesión.
 - **Entrenar**: lista de rutinas y sesión en curso (peso, reps, RIR, calentamiento, PR, temporizador de descanso, referencia de la vez pasada).
 - **Historial**: lista de sesiones; cada una se puede editar (peso, reps, RIR, tipo de serie), borrar serie por serie o borrar completa.
+- **Sesión**: sugerencia de progresión (estimación) según tu última vez y el rango de la rutina, calculadora de discos y notas por serie y por ejercicio.
 - **Mis rutinas**: crea, edita y borra tus rutinas (día, ejercicios nuevos o del catálogo, series, rango de reps y RIR, descanso, orden).
 - Instalable como PWA (manifest). Progreso (series efectivas por grupo, PRs, gráfica y 1RM estimado por ejercicio) y Calendario (mes, racha semanal).
 
@@ -46,6 +47,10 @@ Historial por ejercicio, Progreso y Calendario ya están implementados.
 - `src/proxy.ts` refresca la sesión y redirige a `/login`.
 - `supabase/schema.sql` tablas, RLS, vista de series por grupo muscular y `seed_defaults()`.
 
-## Siguiente (Fase 2)
+## Modo sin señal
 
-Modo offline para sesiones y más métricas corporales.
+La sesión de entrenamiento funciona sin señal: cada serie se guarda primero en el teléfono (localStorage) y se envía en orden a `/api/sync` en cuanto vuelve la conexión. Cada serie lleva un id generado en el teléfono, así que un reintento no la duplica. No hay service worker: la sesión se abre con señal (al llegar al gym) y de ahí se puede registrar sin red; recargar la página sin señal no funciona.
+
+## Siguiente
+
+Más métricas corporales (v3).

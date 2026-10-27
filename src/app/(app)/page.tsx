@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getUnit } from "@/lib/unit.server";
 import { UnitToggle } from "@/components/UnitToggle";
-import { seedDefaults, startWorkout, signOut } from "@/app/actions";
+import { seedDefaults, startWorkout } from "@/app/actions";
+import { SignOutForm } from "@/components/SignOutForm";
 import {
   addDays,
   formatLong,
@@ -243,11 +244,7 @@ export default async function HoyPage() {
 
       <UnitToggle unit={unit} />
 
-      <form action={signOut} className="pt-2">
-        <button type="submit" className="text-sm text-muted underline">
-          Cerrar sesión
-        </button>
-      </form>
+      <SignOutForm />
     </div>
   );
 }
