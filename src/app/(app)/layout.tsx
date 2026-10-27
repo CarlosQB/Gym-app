@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/BottomNav";
+import { OfflineSync } from "@/components/OfflineSync";
 import { RemoveOldSW } from "@/components/RemoveOldSW";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -14,6 +15,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <BottomNav />
+      <OfflineSync />
       <RemoveOldSW />
     </>
   );
