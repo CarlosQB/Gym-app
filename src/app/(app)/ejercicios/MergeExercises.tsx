@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { mergeExercises } from "@/app/actions";
 import { duplicatePairs, getNotDuplicates, isMarkedDifferent, markNotDuplicate } from "@/lib/similar";
 
-export type ExerciseOption = { id: string; name: string; muscle: string; sets: number };
+export type ExerciseOption = { id: string; name: string; muscle: string; sets: number; image?: string | null };
 
 export function MergeExercises({ exercises }: { exercises: ExerciseOption[] }) {
   const [fromId, setFromId] = useState("");

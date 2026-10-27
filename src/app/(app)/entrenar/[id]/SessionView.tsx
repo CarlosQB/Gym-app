@@ -20,6 +20,7 @@ import type { LastBest, LastSetRow, RoutineExercise, SetKind, SetRow, Workout } 
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
 import { planFor, type PlanStep } from "@/lib/progression";
 import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
+import { TechniqueToggle } from "@/components/Technique";
 
 // Solo se llama desde manejadores de eventos (nunca durante el render).
 const nowMs = () => Date.now();
@@ -584,6 +585,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
               </div>
             )}
 
+            <TechniqueToggle key={`t-${m.id}`} imageId={m.ex.image_id} name={m.ex.name} />
             <ExerciseNote key={m.id} exerciseId={m.id} initial={m.ex.notes ?? null} />
 
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
