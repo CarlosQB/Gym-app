@@ -22,7 +22,7 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
 
   const { data } = await supabase
     .from("sets")
-    .select("*, exercise:exercises(name, muscle_group)")
+    .select("id, exercise_id, set_number, kind, weight_kg, reps, rir, is_pr, exercise:exercises(name, muscle_group)")
     .eq("workout_id", id)
     .order("created_at");
   const rows = (data ?? []) as unknown as Row[];

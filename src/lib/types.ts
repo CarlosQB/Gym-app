@@ -3,7 +3,6 @@ export type Exercise = {
   name: string;
   muscle_group: string;
   equipment: string | null;
-  notes?: string | null;
 };
 
 export type Routine = {
@@ -48,7 +47,6 @@ export type SetRow = {
   reps: number;
   rir: number | null;
   is_pr: boolean;
-  note?: string | null;
   created_at: string;
 };
 

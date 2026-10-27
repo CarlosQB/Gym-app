@@ -14,7 +14,6 @@ export type EditableSet = {
   reps: number;
   rir: number | null;
   is_pr: boolean;
-  note?: string | null;
 };
 
 const KINDS: { value: SetKind; label: string }[] = [
@@ -32,7 +31,6 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
   const [reps, setReps] = useState(String(s.reps));
   const [rir, setRir] = useState(s.rir === null ? "" : String(s.rir));
   const [kind, setKind] = useState<SetKind>(s.kind);
-  const [note, setNote] = useState(s.note ?? "");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -40,8 +38,7 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
     Number(weight.replace(",", ".")) !== shown ||
     Number(reps) !== s.reps ||
     (rir === "" ? null : Number(rir)) !== s.rir ||
-    kind !== s.kind ||
-    note.trim() !== (s.note ?? "");
+    kind !== s.kind;
 
   function save() {
     setMsg(null);
@@ -53,7 +50,6 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
         weightKg: fromDisplay(Number(weight.replace(",", ".")), unit),
         reps: Number(reps),
         rir: rir === "" ? null : Number(rir),
-        note,
       });
       setMsg(res.ok ? "Guardado" : (res.error ?? "Error"));
     });
@@ -104,14 +100,6 @@ function Row({ workoutId, s, n, unit }: { workoutId: string; s: EditableSet; n: 
           />
         </label>
       </div>
-      <input
-        aria-label="Nota de la serie"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        maxLength={300}
-        placeholder="Nota (opcional)"
-        className="ml-7 h-10 rounded-xl bg-surface-2 px-3 text-sm text-text outline-none"
-      />
       <div className="flex items-center gap-2 pl-7">
         <select
           aria-label="Tipo de serie"

@@ -12,7 +12,6 @@ export type SaveOp = {
   weightKg: number;
   reps: number;
   rir: number | null;
-  note: string | null;
 };
 export type DelOp = { op: "del"; qid: string; id: string; workoutId: string };
 export type FinishOp = { op: "finish"; qid: string; workoutId: string; endedAt: string };

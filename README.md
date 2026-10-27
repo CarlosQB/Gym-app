@@ -8,7 +8,6 @@ App personal para llevar el progreso en el gym: series, peso (en libras), reps, 
 - **Hoy**: rutina del día, semana, racha y última sesión.
 - **Entrenar**: lista de rutinas y sesión en curso (peso, reps, RIR, calentamiento, PR, temporizador de descanso, referencia de la vez pasada).
 - **Historial**: lista de sesiones; cada una se puede editar (peso, reps, RIR, tipo de serie), borrar serie por serie o borrar completa.
-- **Sesión**: sugerencia de progresión (estimación) según tu última vez y el rango de la rutina, calculadora de discos y notas por serie y por ejercicio.
 - **Mis rutinas**: crea, edita y borra tus rutinas (día, ejercicios nuevos o del catálogo, series, rango de reps y RIR, descanso, orden).
 - Instalable como PWA (manifest). Progreso (series efectivas por grupo, PRs, gráfica y 1RM estimado por ejercicio) y Calendario (mes, racha semanal).
 
