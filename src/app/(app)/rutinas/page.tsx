@@ -45,6 +45,10 @@ export default async function RutinasPage() {
         </ul>
       )}
 
+      <Link href="/ejercicios" className="text-center text-sm text-muted underline">
+        ¿Un ejercicio quedó con dos nombres? Unir ejercicios
+      </Link>
+
       <Link
         href="/rutinas/nueva"
         className="flex h-14 items-center justify-center rounded-2xl bg-accent text-lg font-semibold text-bg"

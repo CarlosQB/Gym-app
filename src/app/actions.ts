@@ -177,6 +177,38 @@ export async function updateExerciseNote(exerciseId: string, note: string) {
   revalidatePath("/", "layout");
 }
 
+/** Une dos ejercicios repetidos: series y rutinas pasan a `toId` y `fromId` se borra. */
+export async function mergeExercises(fromId: string, toId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!fromId || !toId || fromId === toId) return { ok: false, error: "Elige dos ejercicios distintos" };
+  const supabase = await createClient();
+
+  const { data: pair } = await supabase.from("exercises").select("id, notes").in("id", [fromId, toId]);
+  if (!pair || pair.length !== 2) return { ok: false, error: "No se encontraron los ejercicios" };
+
+  // Primero se mueve todo; el borrado va al final para no perder nada si algo falla.
+  const steps = [
+    supabase.from("sets").update({ exercise_id: toId }).eq("exercise_id", fromId),
+    supabase.from("routine_exercises").update({ exercise_id: toId }).eq("exercise_id", fromId),
+    supabase.from("routine_exercises").update({ alt_exercise_id: toId }).eq("alt_exercise_id", fromId),
+  ];
+  for (const step of steps) {
+    const { error } = await step;
+    if (error) return { ok: false, error: error.message };
+  }
+  // Una variante igual a su ejercicio principal ya no tiene sentido.
+  await supabase.from("routine_exercises").update({ alt_exercise_id: null }).eq("exercise_id", toId).eq("alt_exercise_id", toId);
+
+  const fromNotes = pair.find((e) => e.id === fromId)?.notes;
+  const toNotes = pair.find((e) => e.id === toId)?.notes;
+  if (fromNotes && !toNotes) await supabase.from("exercises").update({ notes: fromNotes }).eq("id", toId);
+
+  const { error } = await supabase.from("exercises").delete().eq("id", fromId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function deleteWorkout(workoutId: string): Promise<{ ok: false; error: string }> {
   const supabase = await createClient();
   // Las series se borran en cascada.
