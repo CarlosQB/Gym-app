@@ -2,7 +2,7 @@
 // - /_next/static (JS, CSS, fuentes) e iconos: se guardan y se sirven del caché.
 // - Páginas: red primero (con límite de espera) y, si falla, la última copia guardada.
 // Los datos nuevos se guardan en el teléfono y se sincronizan al volver la conexión (ver src/lib/offline.ts).
-const VERSION = "v1";
+const VERSION = "v2";
 const PAGES = `gym-pages-${VERSION}`;
 const STATIC = `gym-static-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
@@ -43,19 +43,27 @@ async function cacheFirst(request) {
 
 async function networkFirst(request) {
   const cache = await caches.open(PAGES);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
-  try {
-    const res = await fetch(request, { signal: controller.signal });
-    clearTimeout(timer);
-    const path = new URL(request.url).pathname;
+  const path = new URL(request.url).pathname;
+
+  const network = fetch(request).then((res) => {
     // No se guardan redirecciones (p. ej. a /login) ni respuestas con error.
     if (res.ok && !res.redirected && !path.startsWith("/login")) {
       cache.put(request, res.clone());
     }
     return res;
+  });
+
+  try {
+    // Si la red tarda mucho y hay copia guardada, se muestra la copia;
+    // si no hay copia, se sigue esperando a la red (nunca se corta una carga lenta).
+    const cached = await cache.match(request);
+    if (!cached) return await network;
+    const slow = new Promise((resolve) => setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS));
+    const winner = await Promise.race([network, slow]);
+    if (winner) return winner;
+    network.catch(() => {});
+    return cached;
   } catch {
-    clearTimeout(timer);
     const hit = await cache.match(request);
     if (hit) return hit;
     return new Response(
