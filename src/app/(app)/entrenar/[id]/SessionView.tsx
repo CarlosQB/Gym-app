@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib
 import { planFor, type PlanStep } from "@/lib/progression";
 import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
 import { TechniqueToggle } from "@/components/Technique";
+import { keepScreenOn, restFinished, unlockAudio } from "@/lib/alerts";
 
 // Solo se llama desde manejadores de eventos (nunca durante el render).
 const nowMs = () => Date.now();
@@ -322,6 +323,15 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
   }, [restEnd]);
   const restLeft = restEnd ? Math.max(0, (restEnd - now) / 1000) : 0;
   const resting = restEnd !== null && restLeft > 0;
+  // Al terminar el descanso: vibra y suena una sola vez por descanso.
+  const alertedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (restEnd !== null && !resting && alertedFor.current !== restEnd) {
+      alertedFor.current = restEnd;
+      restFinished();
+    }
+  }, [restEnd, resting]);
+  useEffect(() => keepScreenOn(), []);
 
   // Plan del ejercicio activo y la vez pasada, para mostrarlos.
   const lastForActive = active ? lastBest[active.id] : undefined;
@@ -348,6 +358,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
   const nextNumber = exSets.length + 1;
 
   function onSave() {
+    unlockAudio();
     const entered = Number(weight.replace(",", "."));
     const w = fromDisplay(entered, unit);
     const r = Number(reps);

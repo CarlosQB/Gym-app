@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SubmitButton } from "@/components/SubmitButton";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { createClient } from "@/lib/supabase/server";
 import { getUnit } from "@/lib/unit.server";
 import { UnitToggle } from "@/components/UnitToggle";
@@ -121,6 +122,7 @@ export default async function HoyPage() {
       </header>
 
       <DuplicatePrompt exercises={allExercises} />
+      <InstallPrompt />
 
       <section aria-label="Semana" className="flex flex-col gap-2">
         <div className="flex justify-between">

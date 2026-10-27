@@ -10,12 +10,16 @@ export const metadata: Metadata = {
   title: { default: "Gym", template: "%s · Gym" },
   description: "Mi progreso en el gym: series, RIR, rutinas y avance.",
   manifest: "/manifest.webmanifest",
+  // Instalada en iPhone: pantalla completa, sin barra del navegador.
+  appleWebApp: { capable: true, title: "Gym", statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0d0e10",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
