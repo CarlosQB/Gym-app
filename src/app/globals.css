@@ -42,6 +42,46 @@ button {
   cursor: pointer;
 }
 
+/* Animación al tocar: botones y links con forma de botón se hunden un poco. */
+button,
+a[class*="rounded"],
+summary {
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+button:not(:disabled):active,
+a[class*="rounded"]:active,
+summary:active {
+  transform: scale(0.96);
+}
+@media (hover: hover) {
+  button:not(:disabled):hover,
+  a[class*="rounded"]:hover {
+    filter: brightness(1.1);
+  }
+}
+button:disabled {
+  cursor: default;
+}
+
+/* Las pantallas y tarjetas entran con un desvanecido corto. */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.aparecer {
+  animation: aparecer 220ms ease-out both;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }

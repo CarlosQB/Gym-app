@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createClient } from "@/lib/supabase/server";
 import { getUnit } from "@/lib/unit.server";
 import { UnitToggle } from "@/components/UnitToggle";
@@ -197,12 +198,12 @@ export default async function HoyPage() {
           </ul>
 
           <form action={startWorkout.bind(null, todayRoutine.id)} className="mt-3.5">
-            <button
-              type="submit"
+            <SubmitButton
+              pendingText="Abriendo sesión…"
               className="h-14 w-full rounded-2xl bg-accent text-lg font-semibold text-bg"
             >
               Iniciar entrenamiento
-            </button>
+            </SubmitButton>
           </form>
         </section>
       ) : (
@@ -218,12 +219,12 @@ export default async function HoyPage() {
             Crear mi rutina
           </Link>
           <form action={seedDefaults}>
-            <button
-              type="submit"
+            <SubmitButton
+              pendingText="Cargando…"
               className="h-14 w-full rounded-2xl bg-surface-2 text-lg font-semibold text-text"
             >
               Cargar rutina de ejemplo
-            </button>
+            </SubmitButton>
           </form>
         </section>
       )}

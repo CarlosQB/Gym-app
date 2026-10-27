@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setExerciseImage } from "@/app/actions";
 import { loadCatalog, searchCatalog, techniqueImages, type CatalogItem } from "@/lib/technique";
+import { Spinner } from "@/components/Spinner";
 
 /** Las 2 fotos de técnica: inicio y final. */
 export function TechniqueImages({ imageId, name }: { imageId: string; name: string }) {
@@ -122,7 +123,14 @@ export function TechniquePicker({
               onClick={() => save(selected.id)}
               className="h-11 flex-1 rounded-xl bg-accent font-semibold text-bg disabled:opacity-60"
             >
-              {pending ? "Guardando…" : "Usar esta imagen"}
+              {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Guardando…
+            </span>
+          ) : (
+            "Usar esta imagen"
+          )}
             </button>
             <button
               type="button"
@@ -144,7 +152,10 @@ export function TechniquePicker({
               className="h-11 rounded-xl bg-surface-2 px-3 text-[15px] text-text outline-none"
             />
           </label>
-          {catalog === null && !msg && <p className="text-sm text-muted">Cargando catálogo…</p>}
+          {catalog === null && !msg && <p className="flex items-center gap-2 text-sm text-muted">
+              <Spinner className="text-accent" />
+              Cargando catálogo…
+            </p>}
           {catalog && results.length === 0 && (
             <p className="text-sm text-muted">Sin resultados. Prueba con otra palabra, por ejemplo &quot;press&quot; o &quot;remo&quot;.</p>
           )}

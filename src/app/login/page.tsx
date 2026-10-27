@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signIn } from "./actions";
+import { Spinner } from "@/components/Spinner";
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(signIn, { error: null });
@@ -46,7 +47,14 @@ export default function LoginPage() {
           disabled={pending}
           className="h-14 rounded-2xl bg-accent text-lg font-semibold text-bg disabled:opacity-60"
         >
-          {pending ? "Entrando…" : "Entrar"}
+          {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Entrando…
+            </span>
+          ) : (
+            "Entrar"
+          )}
         </button>
       </form>
     </main>

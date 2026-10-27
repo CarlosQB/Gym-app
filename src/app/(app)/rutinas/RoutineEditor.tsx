@@ -5,6 +5,7 @@ import Link from "next/link";
 import { deleteRoutine, saveRoutine, type RoutineInput } from "@/app/actions";
 import type { Exercise } from "@/lib/types";
 import { isSimilar, norm } from "@/lib/similar";
+import { Spinner } from "@/components/Spinner";
 
 const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MUSCLES = [
@@ -448,7 +449,14 @@ export function RoutineEditor({
         onClick={submit}
         className="h-14 rounded-2xl bg-accent text-lg font-semibold text-bg disabled:opacity-50"
       >
-        {pending ? "Guardando…" : "Guardar rutina"}
+        {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Guardando…
+            </span>
+          ) : (
+            "Guardar rutina"
+          )}
       </button>
 
       {initial?.id && (

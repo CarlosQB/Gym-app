@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { mergeExercises } from "@/app/actions";
 import { duplicatePairs, getNotDuplicates, isMarkedDifferent, markNotDuplicate, type ExerciseLite } from "@/lib/similar";
+import { Spinner } from "@/components/Spinner";
 
 /** Pregunta, de uno en uno, si dos ejercicios con nombres parecidos son el mismo. */
 export function DuplicatePrompt({ exercises }: { exercises: ExerciseLite[] }) {
@@ -62,7 +63,14 @@ export function DuplicatePrompt({ exercises }: { exercises: ExerciseLite[] }) {
           onClick={yes}
           className="h-11 flex-1 rounded-xl bg-accent font-semibold text-bg disabled:opacity-60"
         >
-          {pending ? "Uniendo…" : "Sí, unir"}
+          {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Uniendo…
+            </span>
+          ) : (
+            "Sí, unir"
+          )}
         </button>
         <button
           type="button"
