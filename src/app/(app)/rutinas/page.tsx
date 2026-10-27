@@ -49,9 +49,6 @@ export default async function RutinasPage() {
       >
         Nueva rutina
       </Link>
-      <Link href="/ejercicios" className="text-center text-sm text-accent underline">
-        Editar ejercicios (grupo muscular y video)
-      </Link>
     </div>
   );
 }

@@ -12,7 +12,6 @@ create table if not exists public.exercises (
   muscle_group text not null,
   equipment text,
   notes text,
-  video_url text, -- enlace de técnica (migrations/005)
   created_at timestamptz not null default now(),
   unique (user_id, name)
 );
@@ -75,8 +74,7 @@ create table if not exists public.body_metrics (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   measured_on date not null default current_date,
-  weight_kg numeric(5,2), -- peso corporal, se guarda en LIBRAS
-  waist_cm numeric(5,1), -- migrations/005
+  weight_kg numeric(5,2),
   notes text
 );
 

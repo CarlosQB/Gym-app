@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateExercise, updateExerciseNote } from "@/app/actions";
+import { updateExerciseNote } from "@/app/actions";
 import type { Suggestion } from "@/lib/progression";
 import type { Unit } from "@/lib/units";
 
@@ -144,105 +144,5 @@ export function ExerciseNote({ exerciseId, initial }: { exerciseId: string; init
       placeholder="Ej. ajuste del asiento, agarre, tempo…"
       className="mb-2 w-full resize-none rounded-xl bg-surface-2 px-3 py-2 text-sm text-text outline-none"
     />
-  );
-}
-
-const YT = /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/))([\w-]{11})/;
-
-export function TechniqueVideo({ exerciseId, initial }: { exerciseId: string; initial: string | null }) {
-  const [url, setUrl] = useState(initial ?? "");
-  const [draft, setDraft] = useState(initial ?? "");
-  const [editing, setEditing] = useState(false);
-  const [show, setShow] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save() {
-    setError(null);
-    try {
-      const res = await updateExercise({ id: exerciseId, videoUrl: draft });
-      if (!res.ok) {
-        setError(res.error ?? "No se pudo guardar");
-        return;
-      }
-      setUrl(draft.trim());
-      setEditing(false);
-    } catch {
-      setError("Necesitas conexión para guardar el enlace");
-    }
-  }
-
-  const yt = url ? YT.exec(url)?.[1] : undefined;
-
-  if (editing) {
-    return (
-      <div className="mb-2 flex flex-col gap-2">
-        <input
-          aria-label="Enlace del video de técnica"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          inputMode="url"
-          placeholder="https://youtube.com/watch?v=…"
-          className="h-11 rounded-xl bg-surface-2 px-3 text-sm text-text outline-none"
-        />
-        {error && <p className="text-sm text-warn">{error}</p>}
-        <div className="flex gap-2">
-          <button type="button" onClick={save} className="h-10 flex-1 rounded-xl bg-accent text-sm font-semibold text-bg">
-            Guardar enlace
-          </button>
-          <button type="button" onClick={() => setEditing(false)} className="h-10 rounded-xl px-4 text-sm text-muted">
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!url) {
-    return (
-      <button type="button" onClick={() => setEditing(true)} className="mb-1 self-start text-xs text-muted underline">
-        + Video de técnica
-      </button>
-    );
-  }
-
-  return (
-    <div className="mb-2 flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        {yt ? (
-          <button
-            type="button"
-            aria-expanded={show}
-            onClick={() => setShow((v) => !v)}
-            className="h-9 rounded-full bg-surface-2 px-3 text-[13px] font-semibold text-accent"
-          >
-            {show ? "Ocultar técnica" : "Ver técnica"}
-          </button>
-        ) : (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-9 items-center rounded-full bg-surface-2 px-3 text-[13px] font-semibold text-accent"
-          >
-            Ver técnica ↗
-          </a>
-        )}
-        <button type="button" onClick={() => setEditing(true)} className="text-xs text-muted underline">
-          Cambiar enlace
-        </button>
-      </div>
-      {show && yt && (
-        <div className="aspect-video w-full overflow-hidden rounded-xl bg-surface-2">
-          <iframe
-            title="Video de técnica"
-            src={`https://www.youtube-nocookie.com/embed/${yt}`}
-            className="h-full w-full"
-            allow="encrypted-media; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-          />
-        </div>
-      )}
-    </div>
   );
 }

@@ -4,9 +4,24 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { deleteRoutine, saveRoutine, type RoutineInput } from "@/app/actions";
 import type { Exercise } from "@/lib/types";
-import { MUSCLES } from "@/lib/muscles";
 
 const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const MUSCLES = [
+  "Pecho",
+  "Espalda",
+  "Hombros",
+  "Bíceps",
+  "Tríceps",
+  "Cuádriceps",
+  "Isquiotibiales",
+  "Glúteos",
+  "Aductores",
+  "Abductores",
+  "Pantorrillas",
+  "Abdomen",
+  "Antebrazo",
+  "Otro",
+];
 const NEW = "__new";
 
 type Item = {

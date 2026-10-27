@@ -50,11 +50,6 @@ export default async function ProgresoPage() {
     <div className="flex flex-col gap-5">
       <h1 className="font-display text-[38px] font-bold leading-[1.05]">Progreso</h1>
 
-      <Link href="/cuerpo" className="flex items-center justify-between rounded-2xl bg-surface p-4">
-        <span className="font-display text-2xl font-bold">Medidas corporales</span>
-        <span className="text-sm text-muted">Peso y cintura ›</span>
-      </Link>
-
       <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
         <div>
           <h2 className="font-display text-2xl font-bold">Series efectivas esta semana</h2>
