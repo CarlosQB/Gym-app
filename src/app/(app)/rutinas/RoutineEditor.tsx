@@ -36,7 +36,18 @@ type Item = {
   rirMax: string;
   restSeconds: string;
   withPrevious: boolean; // va en el mismo bloque que el ejercicio anterior
+  altId: string; // variante: "" = ninguna, NEW = crear, o id del catálogo
+  altNewName: string;
+  altMuscleGroup: string;
 };
+
+// Para los "press": propone la variante contraria (con barra <-> con mancuernas).
+function pressVariantName(name: string): string | null {
+  if (!/press/i.test(name)) return null;
+  if (/mancuernas?/i.test(name)) return name.replace(/mancuernas?/i, "barra");
+  if (/barra/i.test(name)) return name.replace(/barra/i, "mancuernas");
+  return `${name} con mancuernas`;
+}
 
 const input =
   "tabular h-11 w-full min-w-0 rounded-xl bg-surface-2 px-2 text-center font-display text-xl font-bold text-text outline-none";
@@ -58,6 +69,9 @@ function blank(): Item {
     rirMax: "2",
     restSeconds: "120",
     withPrevious: false,
+    altId: "",
+    altNewName: "",
+    altMuscleGroup: "Pecho",
   };
 }
 
@@ -103,6 +117,9 @@ export function RoutineEditor({
             rirMax: String(it.rirMax),
             restSeconds: String(it.restSeconds),
             withPrevious: it.withPrevious,
+            altId: it.altExerciseId ?? "",
+            altNewName: "",
+            altMuscleGroup: "Pecho",
           };
         })
       : [blank()],
@@ -139,6 +156,9 @@ export function RoutineEditor({
         rirMax: Number(it.rirMax),
         restSeconds: Number(it.restSeconds),
         withPrevious: it.withPrevious,
+        altExerciseId: it.altId && it.altId !== NEW ? it.altId : null,
+        altNewName: it.altId === NEW ? it.altNewName : "",
+        altMuscleGroup: it.altMuscleGroup,
       })),
     };
     start(async () => {
@@ -272,6 +292,76 @@ export function RoutineEditor({
             <Num label="RIR MÍN" value={it.rirMin} onChange={(v) => patch(it.key, { rirMin: v })} />
             <Num label="RIR MÁX" value={it.rirMax} onChange={(v) => patch(it.key, { rirMax: v })} />
             <Num label="DESCANSO (s)" value={it.restSeconds} onChange={(v) => patch(it.key, { restSeconds: v })} />
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <p className="text-xs font-medium tracking-[0.06em] text-muted">
+              VARIANTE (OPCIONAL) · SE ELIGE AL ENTRENAR
+            </p>
+            <select
+              aria-label="Variante del ejercicio"
+              value={it.altId}
+              onChange={(e) => patch(it.key, { altId: e.target.value })}
+              className={select}
+            >
+              <option value="">Sin variante</option>
+              {catalog
+                .filter((ex) => ex.id !== it.exerciseId)
+                .map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} · {ex.muscle_group}
+                  </option>
+                ))}
+              <option value={NEW}>+ Variante nueva…</option>
+            </select>
+
+            {(() => {
+              const main = catalog.find((ex) => ex.id === it.exerciseId);
+              const name = main?.name ?? (it.exerciseId === NEW ? it.newName : "");
+              const suggestion = it.altId ? null : pressVariantName(name);
+              if (!suggestion) return null;
+              const existing = catalog.find((ex) => ex.name.toLowerCase() === suggestion.toLowerCase());
+              return (
+                <button
+                  type="button"
+                  onClick={() =>
+                    patch(
+                      it.key,
+                      existing
+                        ? { altId: existing.id }
+                        : { altId: NEW, altNewName: suggestion, altMuscleGroup: main?.muscle_group ?? it.muscleGroup },
+                    )
+                  }
+                  className="min-h-11 rounded-xl bg-accent-dim px-3 text-left text-sm font-semibold text-accent ring-1 ring-[#3a4020]"
+                >
+                  + Agregar variante: {suggestion}
+                </button>
+              );
+            })()}
+
+            {it.altId === NEW && (
+              <>
+                <input
+                  aria-label="Nombre de la variante"
+                  value={it.altNewName}
+                  onChange={(e) => patch(it.key, { altNewName: e.target.value })}
+                  placeholder="Nombre de la variante"
+                  className="h-12 rounded-xl bg-surface-2 px-3 text-[16px] text-text outline-none"
+                />
+                <select
+                  aria-label="Grupo muscular de la variante"
+                  value={it.altMuscleGroup}
+                  onChange={(e) => patch(it.key, { altMuscleGroup: e.target.value })}
+                  className={select}
+                >
+                  {MUSCLES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
 
           {i > 0 && (

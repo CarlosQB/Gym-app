@@ -15,6 +15,13 @@ type Props = {
 };
 
 // Agrupa los ejercicios: los marcados "va después del anterior" se hacen en el mismo bloque.
+// Ejercicio que se hace hoy en este lugar de la rutina: el principal o su variante.
+function pickEx(re: RoutineExercise, useAlt: boolean) {
+  return useAlt && re.alt_exercise && re.alt_exercise_id
+    ? { id: re.alt_exercise_id, ex: re.alt_exercise }
+    : { id: re.exercise_id, ex: re.exercise };
+}
+
 function groupSlots(items: RoutineExercise[]) {
   const slots: RoutineExercise[][] = [];
   for (const it of items) {
@@ -98,6 +105,17 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     a.type === "add" ? [...cur, a.set] : cur.filter((s) => s.id !== a.id),
   );
   const slots = useMemo(() => groupSlots(items), [items]);
+  // Variante elegida por ejercicio de rutina (true = la variante). Arranca con la que ya tenga series.
+  const [variant, setVariant] = useState<Record<string, boolean>>(() => {
+    const v: Record<string, boolean> = {};
+    for (const it of items) {
+      if (!it.alt_exercise_id) continue;
+      const a = serverSets.filter((s) => s.exercise_id === it.alt_exercise_id).length;
+      const b = serverSets.filter((s) => s.exercise_id === it.exercise_id).length;
+      if (a > b) v[it.id] = true;
+    }
+    return v;
+  });
   // Cuál ejercicio de cada bloque está activo (0 = primero, 1 = el que sigue…).
   const [sub, setSub] = useState<Record<string, number>>({});
 
@@ -106,7 +124,11 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     const i = slots.findIndex((slot) =>
       slot.some(
         (re) =>
-          sets.filter((s) => s.exercise_id === re.exercise_id && s.kind !== "warmup").length <
+          sets.filter(
+            (s) =>
+              (s.exercise_id === re.exercise_id || s.exercise_id === re.alt_exercise_id) &&
+              s.kind !== "warmup",
+          ).length <
           re.target_sets,
       ),
     );
@@ -116,11 +138,11 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   }, []);
 
   // Valores más útiles para precargar al entrar a un ejercicio.
-  function defaultsFor(i: number, subIdx = 0) {
+  function defaultsFor(i: number, subIdx = 0, map: Record<string, boolean> = variant) {
     const slot = slots[i];
     if (!slot) return { weight: String(defaultWeight(unit)), reps: "10", rir: null as number | null };
     const it = slot[subIdx] ?? slot[0];
-    const id = it.exercise_id;
+    const id = pickEx(it, !!map[it.id]).id;
     const mine = sets.filter((s) => s.exercise_id === id);
     const last = mine[mine.length - 1];
     const best = lastBest[id];
@@ -142,7 +164,10 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
   const [prFlash, setPrFlash] = useState(false);
 
   const slot = slots[index];
-  const members = (slot ?? []).map((re) => ({ id: re.exercise_id, ex: re.exercise, re }));
+  const members = (slot ?? []).map((re) => {
+    const p = pickEx(re, !!variant[re.id]);
+    return { id: p.id, ex: p.ex, re };
+  });
   const activeSub = slot ? Math.min(sub[String(index)] ?? 0, members.length - 1) : 0;
   const active = slot ? members[activeSub] : null;
   const item = active?.re;
@@ -177,6 +202,20 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     (sizes[index] ?? 1) > 1
       ? `${firstNumber}–${firstNumber + sizes[index] - 1}`
       : String(firstNumber);
+
+  function chooseVariant(re: RoutineExercise, useAlt: boolean, memberIndex: number) {
+    if (!!variant[re.id] === useAlt) return;
+    const next = { ...variant, [re.id]: useAlt };
+    setVariant(next);
+    if (memberIndex === activeSub) {
+      const d = defaultsFor(index, memberIndex, next);
+      setWeight(d.weight);
+      setReps(d.reps);
+      setRir(d.rir);
+      setWarmup(false);
+      setError(null);
+    }
+  }
 
   function objective(m: { id: string; re: RoutineExercise }) {
     const p = lastBest[m.id];
@@ -381,7 +420,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         const pair = members.length > 1;
         return (
           <div
-            key={m.id}
+            key={m.re.id}
             className={
               pair
                 ? `flex flex-col rounded-2xl p-3 ${isActive ? "bg-surface ring-1 ring-accent" : "bg-surface/50"}`
@@ -401,6 +440,32 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
                 </p>
                 <p className="text-sm text-muted">{objective(m)}</p>
               </button>
+            )}
+
+            {m.re.alt_exercise && (
+              <div
+                role="group"
+                aria-label="Variante del ejercicio"
+                className="mb-2 flex gap-1 rounded-xl bg-surface-2 p-1"
+              >
+                {[false, true].map((useAlt) => {
+                  const ex = useAlt ? m.re.alt_exercise! : m.re.exercise;
+                  const on = !!variant[m.re.id] === useAlt;
+                  return (
+                    <button
+                      key={String(useAlt)}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => chooseVariant(m.re, useAlt, mi)}
+                      className={`min-h-11 flex-1 rounded-[10px] px-2 text-[13px] font-semibold leading-tight ${
+                        on ? "bg-accent text-bg" : "text-text"
+                      }`}
+                    >
+                      {ex.name}
+                    </button>
+                  );
+                })}
+              </div>
             )}
 
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">

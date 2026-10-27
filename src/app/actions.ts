@@ -180,6 +180,10 @@ export type RoutineItemInput = {
   restSeconds: number;
   /** true = va en el mismo bloque que el ejercicio anterior */
   withPrevious: boolean;
+  /** Variante del ejercicio (ej. con barra / con mancuernas): se elige al entrenar. */
+  altExerciseId: string | null;
+  altNewName: string;
+  altMuscleGroup: string;
 };
 
 export type RoutineInput = {
@@ -266,10 +270,20 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
   }
 
   const exerciseIds: string[] = [];
+  const altIds: (string | null)[] = [];
   for (const it of input.items) {
     const main = await resolveExercise(it.exerciseId, it.newName, it.muscleGroup);
     if ("error" in main) return { ok: false, error: main.error };
     exerciseIds.push(main.id);
+
+    if (it.altExerciseId || it.altNewName.trim()) {
+      const alt = await resolveExercise(it.altExerciseId, it.altNewName, it.altMuscleGroup);
+      if ("error" in alt) return { ok: false, error: alt.error };
+      if (alt.id === main.id) return { ok: false, error: "La variante debe ser distinta al ejercicio principal" };
+      altIds.push(alt.id);
+    } else {
+      altIds.push(null);
+    }
   }
 
   // 3. Se insertan las filas nuevas y después se borran las anteriores (no se pierde nada si falla).
@@ -290,6 +304,7 @@ export async function saveRoutine(input: RoutineInput): Promise<{ ok: false; err
       rir_max: it.rirMax,
       rest_seconds: it.restSeconds,
       with_previous: i > 0 && it.withPrevious,
+      alt_exercise_id: altIds[i],
     })),
   );
   if (insErr) return { ok: false, error: insErr.message };

@@ -46,7 +46,7 @@ export default async function HoyPage() {
       .maybeSingle(),
     supabase
       .from("routine_exercises")
-      .select("*, exercise:exercises!exercise_id(*)")
+      .select("*, exercise:exercises!exercise_id(*), alt_exercise:exercises!alt_exercise_id(*)")
       .order("position"),
     supabase
       .from("workouts")
@@ -177,6 +177,7 @@ export default async function HoyPage() {
               >
                 <span>
                   {re.exercise.name}
+                  {re.alt_exercise && <span className="text-muted"> / {re.alt_exercise.name}</span>}
                   {re.with_previous && <span className="text-muted"> · después</span>}
                 </span>
                 <span className="tabular text-muted">

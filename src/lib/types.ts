@@ -24,7 +24,9 @@ export type RoutineExercise = {
   rir_max: number;
   rest_seconds: number;
   with_previous: boolean;
+  alt_exercise_id: string | null;
   exercise: Exercise;
+  alt_exercise: Exercise | null;
 };
 
 export type Workout = {

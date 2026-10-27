@@ -35,6 +35,9 @@ export default async function EditarRutinaPage(props: PageProps<"/rutinas/[id]">
           rirMax: it.rir_max,
           restSeconds: it.rest_seconds,
           withPrevious: it.with_previous,
+          altExerciseId: it.alt_exercise_id,
+          altNewName: "",
+          altMuscleGroup: "",
         })),
       }}
     />
