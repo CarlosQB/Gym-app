@@ -11,7 +11,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       >
         Saltar al contenido
       </a>
-      <main id="contenido" tabIndex={-1} className="mx-auto w-full max-w-[430px] flex-1 px-5 pb-28 pt-7 outline-none">
+      <main id="contenido" tabIndex={-1} className="mx-auto w-full max-w-[430px] flex-1 px-5 pb-28 pt-[calc(1.75rem+env(safe-area-inset-top))] outline-none">
         {children}
       </main>
       <BottomNav />

@@ -56,7 +56,7 @@ export function OfflineSync() {
   if (online && pending === 0 && failed === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-2 z-20 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-20 flex justify-center px-4">
       <div
         role="status"
         className="pointer-events-auto max-w-[400px] rounded-full bg-surface-2 px-4 py-2 text-center text-[13px] font-semibold ring-1 ring-line"
