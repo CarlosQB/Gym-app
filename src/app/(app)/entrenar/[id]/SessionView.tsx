@@ -19,7 +19,7 @@ import { FAILED_EVENT, SAVED_EVENT, flushQueue } from "@/lib/sync";
 import type { LastBest, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
 import { suggest } from "@/lib/progression";
-import { ExerciseNote, PlateCalc, SuggestionChip } from "@/components/SessionExtras";
+import { ExerciseNote, NoHistoryChip, PlateCalc, SuggestionChip } from "@/components/SessionExtras";
 
 // Solo se llama desde manejadores de eventos (nunca durante el render).
 const nowMs = () => Date.now();
@@ -657,6 +657,10 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
 
       {/* Captura */}
       <div className="flex flex-col gap-2.5 rounded-[20px] bg-surface p-3.5">
+        {!suggestion && active && !lastForActive && exSets.filter((s) => s.kind === "normal").length === 0 && (
+          <NoHistoryChip />
+        )}
+
         {suggestion && active && (
           <SuggestionChip
             suggestion={suggestion}
