@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { setExerciseImage } from "@/app/actions";
 import { loadCatalog, searchCatalog, techniqueImages, type CatalogItem } from "@/lib/technique";
 
@@ -23,23 +24,56 @@ export function TechniqueImages({ imageId, name }: { imageId: string; name: stri
   );
 }
 
-/** En la sesión: botón que muestra u oculta la técnica del ejercicio. */
-export function TechniqueToggle({ imageId, name }: { imageId: string | null | undefined; name: string }) {
-  const [open, setOpen] = useState(false);
-  if (!imageId) return null;
+/** En la sesión: ver la técnica del ejercicio, o elegir su imagen si aún no tiene. */
+export function TechniqueToggle({
+  exerciseId,
+  imageId,
+  name,
+}: {
+  exerciseId: string;
+  imageId: string | null | undefined;
+  name: string;
+}) {
+  const router = useRouter();
+  const [mode, setMode] = useState<"closed" | "view" | "pick">("closed");
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="min-h-9 text-xs font-semibold text-accent underline"
-      >
-        {open ? "Ocultar técnica" : "Ver técnica"}
-      </button>
-      {open && (
-        <div className="mt-1">
-          <TechniqueImages imageId={imageId} name={name} />
+    <div className="mb-1">
+      <div className="flex gap-4">
+        {imageId ? (
+          <button
+            type="button"
+            aria-expanded={mode === "view"}
+            onClick={() => setMode((m) => (m === "view" ? "closed" : "view"))}
+            className="min-h-9 text-xs font-semibold text-accent underline"
+          >
+            {mode === "view" ? "Ocultar técnica" : "Ver técnica"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-expanded={mode === "pick"}
+            onClick={() => setMode((m) => (m === "pick" ? "closed" : "pick"))}
+            className="min-h-9 text-xs text-muted underline"
+          >
+            + Imagen de técnica
+          </button>
+        )}
+        {imageId && mode === "view" && (
+          <button type="button" onClick={() => setMode("pick")} className="min-h-9 text-xs text-muted underline">
+            Cambiar imagen
+          </button>
+        )}
+      </div>
+      {mode === "view" && imageId && <TechniqueImages imageId={imageId} name={name} />}
+      {mode === "pick" && (
+        <div className="mt-1 rounded-xl bg-surface-2/50 p-2">
+          <TechniquePicker
+            exercise={{ id: exerciseId, name, image: imageId }}
+            onDone={() => {
+              setMode("closed");
+              router.refresh();
+            }}
+          />
         </div>
       )}
     </div>
