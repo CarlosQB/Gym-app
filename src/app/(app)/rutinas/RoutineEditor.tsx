@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { deleteRoutine, saveRoutine, type RoutineInput } from "@/app/actions";
 import type { Exercise } from "@/lib/types";
+import { isSimilar, norm } from "@/lib/similar";
 
 const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MUSCLES = [
@@ -89,6 +90,45 @@ function Num(props: { label: string; value: string; onChange: (v: string) => voi
         className={input}
       />
     </label>
+  );
+}
+
+/** Si el nombre nuevo se parece a uno que ya existe, pregunta si es el mismo. */
+function SameAsPrompt({
+  name,
+  catalog,
+  onUse,
+}: {
+  name: string;
+  catalog: Exercise[];
+  onUse: (ex: Exercise) => void;
+}) {
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  if (norm(name).length < 4 || dismissed === norm(name)) return null;
+  const match = catalog.find((ex) => isSimilar(ex.name, name));
+  if (!match) return null;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl bg-accent-dim p-3 text-sm ring-1 ring-[#3a4020]">
+      <p>
+        Ya tienes <span className="font-semibold">“{match.name}”</span>. ¿Es el mismo ejercicio?
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onUse(match)}
+          className="h-11 flex-1 rounded-xl bg-accent font-semibold text-bg"
+        >
+          Sí, usar ese
+        </button>
+        <button
+          type="button"
+          onClick={() => setDismissed(norm(name))}
+          className="h-11 flex-1 rounded-xl bg-surface-2 font-semibold text-text"
+        >
+          No, es otro
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -268,6 +308,11 @@ export function RoutineEditor({
                 placeholder="Nombre del ejercicio"
                 className="h-12 rounded-xl bg-surface-2 px-3 text-[16px] text-text outline-none"
               />
+              <SameAsPrompt
+                name={it.newName}
+                catalog={catalog}
+                onUse={(ex) => patch(it.key, { exerciseId: ex.id, newName: "" })}
+              />
               <select
                 aria-label="Grupo muscular"
                 value={it.muscleGroup}
@@ -347,6 +392,11 @@ export function RoutineEditor({
                   onChange={(e) => patch(it.key, { altNewName: e.target.value })}
                   placeholder="Nombre de la variante"
                   className="h-12 rounded-xl bg-surface-2 px-3 text-[16px] text-text outline-none"
+                />
+                <SameAsPrompt
+                  name={it.altNewName}
+                  catalog={catalog.filter((ex) => ex.id !== it.exerciseId)}
+                  onUse={(ex) => patch(it.key, { altId: ex.id, altNewName: "" })}
                 />
                 <select
                   aria-label="Grupo muscular de la variante"

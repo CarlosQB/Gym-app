@@ -1,41 +1,23 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { mergeExercises } from "@/app/actions";
+import { duplicatePairs, getNotDuplicates, isMarkedDifferent, markNotDuplicate } from "@/lib/similar";
 
 export type ExerciseOption = { id: string; name: string; muscle: string; sets: number };
-
-// Minúsculas y sin acentos, para comparar nombres ("Jalón" = "jalon").
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/** Pares que parecen el mismo ejercicio: un nombre contiene al otro (estimación). */
-function likelyDuplicates(list: ExerciseOption[]): [ExerciseOption, ExerciseOption][] {
-  const pairs: [ExerciseOption, ExerciseOption][] = [];
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = norm(list[i].name);
-      const b = norm(list[j].name);
-      if (a === b || a.startsWith(b) || b.startsWith(a)) {
-        // Se conserva el que tiene más series.
-        pairs.push(list[i].sets >= list[j].sets ? [list[j], list[i]] : [list[i], list[j]]);
-      }
-    }
-  }
-  return pairs;
-}
 
 export function MergeExercises({ exercises }: { exercises: ExerciseOption[] }) {
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const suggestions = useMemo(() => likelyDuplicates(exercises), [exercises]);
+  const [suggestions, setSuggestions] = useState<[ExerciseOption, ExerciseOption][]>([]);
+  // Los "no son el mismo" viven en el teléfono: se filtran ya en el navegador.
+  useEffect(() => {
+    const different = getNotDuplicates();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSuggestions(duplicatePairs(exercises).filter(([a, b]) => !isMarkedDifferent(different, a.id, b.id)));
+  }, [exercises]);
   const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
 
   function merge(from: string, to: string) {
@@ -83,6 +65,17 @@ export function MergeExercises({ exercises }: { exercises: ExerciseOption[] }) {
                 className="h-11 shrink-0 rounded-xl bg-accent px-4 text-sm font-semibold text-bg disabled:opacity-60"
               >
                 Unir
+              </button>
+              <button
+                type="button"
+                aria-label={`${a.name} y ${b.name} son distintos`}
+                onClick={() => {
+                  markNotDuplicate(a.id, b.id);
+                  setSuggestions((list) => list.filter(([x, y]) => !(x.id === a.id && y.id === b.id)));
+                }}
+                className="h-11 shrink-0 rounded-xl bg-surface-2 px-3 text-sm font-semibold text-muted"
+              >
+                No
               </button>
             </div>
           ))}
