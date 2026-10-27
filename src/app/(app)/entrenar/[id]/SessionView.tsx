@@ -1,22 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { deleteSet, finishWorkout, saveSet } from "@/app/actions";
-import {
-  addLocalSet,
-  dropQueuedSave,
-  enqueue,
-  getDeleted,
-  getLocalSets,
-  isNetworkError,
-  markDeleted,
-  removeLocalSets,
-  snapshotStorage,
-  subscribeStorage,
-} from "@/lib/offline";
-import type { LastBest, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
+import type { LastBest, RoutineExercise, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
 
 type Props = {
@@ -102,25 +89,14 @@ function Stepper(props: {
   );
 }
 
+type SetAction = { type: "add"; set: SetRow } | { type: "del"; id: string };
+
 export function SessionView({ workout, items, sets: serverSets, lastBest, unit }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
-
-  // Series guardadas en este teléfono (aún sin confirmar o sin reflejarse en la página).
-  const localSnapshot = useSyncExternalStore(subscribeStorage, snapshotStorage, () => "");
-  const sets = useMemo(() => {
-    void localSnapshot; // se recalcula cuando cambia el almacenamiento local
-    const deleted = new Set(getDeleted());
-    const known = new Set(serverSets.map((s) => s.id));
-    const extra = getLocalSets(workout.id).filter((s) => !known.has(s.id));
-    return [...serverSets, ...extra].filter((s) => !deleted.has(s.id));
-  }, [serverSets, localSnapshot, workout.id]);
-
-  // Cuando el servidor ya trae una serie, se limpia su copia local.
-  useEffect(() => {
-    removeLocalSets(serverSets.map((s) => s.id));
-  }, [serverSets]);
-
+  // Las series se ven al instante; el servidor confirma en segundo plano.
+  const [sets, applyOptimistic] = useOptimistic(serverSets, (cur: SetRow[], a: SetAction) =>
+    a.type === "add" ? [...cur, a.set] : cur.filter((s) => s.id !== a.id),
+  );
   const slots = useMemo(() => groupSlots(items), [items]);
   // Cuál ejercicio de cada bloque está activo (0 = primero, 1 = el que sigue…).
   const [sub, setSub] = useState<Record<string, number>>({});
@@ -259,29 +235,13 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
     }
     setError(null);
 
-    const id = crypto.randomUUID();
     const exerciseId = active!.id;
-    const kind: SetKind = warmup ? "warmup" : "normal";
+    const kind = warmup ? "warmup" : "normal";
     const wasWarmup = warmup;
-    const rir2 = wasWarmup ? null : rir;
     const rest = active!.re.rest_seconds;
-    const op = { op: "save" as const, id, workoutId: workout.id, exerciseId, kind, weightKg: w, reps: r, rir: rir2 };
-
-    // La serie se ve al instante: se guarda primero en el teléfono.
-    addLocalSet({
-      id,
-      workout_id: workout.id,
-      exercise_id: exerciseId,
-      set_number: nextNumber,
-      kind,
-      weight_kg: w,
-      reps: r,
-      rir: rir2,
-      is_pr: false,
-      created_at: new Date().toISOString(),
-    });
 
     startTransition(async () => {
+      // Todo lo visible ocurre al instante, sin esperar al servidor.
       if (!wasWarmup) {
         setRestTotal(rest);
         setRestEnd(Date.now() + rest * 1000);
@@ -301,71 +261,46 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
         }
       }
 
-      if (!navigator.onLine) {
-        enqueue(op);
+      applyOptimistic({
+        type: "add",
+        set: {
+          id: `tmp-${Date.now()}`,
+          workout_id: workout.id,
+          exercise_id: exerciseId,
+          set_number: nextNumber,
+          kind,
+          weight_kg: w,
+          reps: r,
+          rir: wasWarmup ? null : rir,
+          is_pr: false,
+          created_at: new Date().toISOString(),
+        },
+      });
+      const res = await saveSet({
+        workoutId: workout.id,
+        exerciseId,
+        kind,
+        weightKg: w,
+        reps: r,
+        rir: wasWarmup ? null : rir,
+      });
+      if (!res.ok) {
+        setError(res.error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
+        setRestEnd(null);
         return;
       }
-      try {
-        const res = await saveSet({ id, workoutId: workout.id, exerciseId, kind, weightKg: w, reps: r, rir: rir2 });
-        if (!res.ok) {
-          removeLocalSets([id]);
-          setError(res.error ?? "No se pudo guardar la serie. Inténtalo de nuevo.");
-          setRestEnd(null);
-          return;
-        }
-        if (res.isPr) {
-          setPrFlash(true);
-          setTimeout(() => setPrFlash(false), 4000);
-        }
-      } catch (e) {
-        if (isNetworkError(e)) {
-          enqueue(op); // sin señal: se sincroniza solo cuando vuelva
-        } else {
-          removeLocalSets([id]);
-          setError("No se pudo guardar la serie. Inténtalo de nuevo.");
-          setRestEnd(null);
-        }
+      if (res.isPr) {
+        setPrFlash(true);
+        setTimeout(() => setPrFlash(false), 4000);
       }
     });
   }
 
   function onDelete(id: string) {
     if (!window.confirm("¿Borrar esta serie?")) return;
-    markDeleted(id);
-    // Si nunca llegó al servidor, basta con quitarla de la cola.
-    if (dropQueuedSave(id)) {
-      removeLocalSets([id]);
-      return;
-    }
     startTransition(async () => {
-      if (!navigator.onLine) {
-        enqueue({ op: "del", id, workoutId: workout.id });
-        return;
-      }
-      try {
-        await deleteSet(id, workout.id);
-      } catch (e) {
-        if (isNetworkError(e)) enqueue({ op: "del", id, workoutId: workout.id });
-      }
-    });
-  }
-
-  function onFinish() {
-    const endedAt = new Date().toISOString();
-    startTransition(async () => {
-      if (navigator.onLine) {
-        try {
-          await finishWorkout(workout.id); // redirige a Hoy
-          return;
-        } catch (e) {
-          if (!isNetworkError(e)) {
-            setError("No se pudo terminar la sesión. Inténtalo de nuevo.");
-            return;
-          }
-        }
-      }
-      enqueue({ op: "finish", workoutId: workout.id, endedAt });
-      router.push("/");
+      applyOptimistic({ type: "del", id });
+      await deleteSet(id, workout.id);
     });
   }
 
@@ -388,14 +323,14 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, unit }
             {clock(elapsed)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onFinish}
-          disabled={pending}
-          className="h-11 rounded-full border border-line px-4 text-[15px] font-semibold text-text disabled:opacity-60"
-        >
-          Terminar
-        </button>
+        <form action={finishWorkout.bind(null, workout.id)}>
+          <button
+            type="submit"
+            className="h-11 rounded-full border border-line px-4 text-[15px] font-semibold text-text"
+          >
+            Terminar
+          </button>
+        </form>
       </div>
 
       {/* Ejercicio */}
