@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/components/SubmitButton";
 import { createClient } from "@/lib/supabase/server";
 import { startWorkout } from "@/app/actions";
 import type { Routine } from "@/lib/types";
@@ -31,12 +32,9 @@ export default async function EntrenarPage() {
                 </p>
               </div>
               <form action={startWorkout.bind(null, r.id)}>
-                <button
-                  type="submit"
-                  className="h-12 rounded-xl bg-accent px-5 font-semibold text-bg"
-                >
+                <SubmitButton pendingText="Abriendo…" className="h-12 rounded-xl bg-accent px-5 font-semibold text-bg">
                   Iniciar
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}

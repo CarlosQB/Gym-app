@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
@@ -31,6 +31,19 @@ const items = [
   },
 ];
 
+/** Barrita bajo la pestaña tocada mientras carga la pantalla. */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={`absolute bottom-1 h-0.5 w-6 rounded-full bg-accent transition-opacity ${
+        pending ? "animate-pulse opacity-100" : "opacity-0"
+      }`}
+    />
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
 
@@ -48,7 +61,7 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold ${
+              className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold ${
                 active ? "text-accent" : "text-muted"
               }`}
             >
@@ -66,6 +79,7 @@ export function BottomNav() {
                 {item.icon}
               </svg>
               <span>{item.label}</span>
+              <NavPending />
             </Link>
           );
         })}

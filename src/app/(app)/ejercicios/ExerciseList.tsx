@@ -6,6 +6,7 @@ import { renameExercise } from "@/app/actions";
 import { TechniquePicker } from "@/components/Technique";
 import { techniqueImages } from "@/lib/technique";
 import type { ExerciseOption } from "./MergeExercises";
+import { Spinner } from "@/components/Spinner";
 
 function Row({ e }: { e: ExerciseOption }) {
   const [mode, setMode] = useState<"view" | "rename" | "image">("view");
@@ -86,7 +87,14 @@ function Row({ e }: { e: ExerciseOption }) {
           onClick={save}
           className="h-11 flex-1 rounded-xl bg-accent font-semibold text-bg disabled:opacity-60"
         >
-          {pending ? "Guardando…" : "Guardar"}
+          {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Guardando…
+            </span>
+          ) : (
+            "Guardar"
+          )}
         </button>
         <button
           type="button"

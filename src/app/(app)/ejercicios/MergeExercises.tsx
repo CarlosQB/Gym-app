@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { mergeExercises } from "@/app/actions";
 import { duplicatePairs, getNotDuplicates, isMarkedDifferent, markNotDuplicate } from "@/lib/similar";
+import { Spinner } from "@/components/Spinner";
 
 export type ExerciseOption = { id: string; name: string; muscle: string; sets: number; image?: string | null };
 
@@ -122,7 +123,14 @@ export function MergeExercises({ exercises }: { exercises: ExerciseOption[] }) {
           onClick={() => merge(fromId, toId)}
           className="h-12 rounded-xl bg-accent font-semibold text-bg disabled:opacity-60"
         >
-          {pending ? "Uniendo…" : "Unir ejercicios"}
+          {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <Spinner />
+              Uniendo…
+            </span>
+          ) : (
+            "Unir ejercicios"
+          )}
         </button>
       </section>
 
