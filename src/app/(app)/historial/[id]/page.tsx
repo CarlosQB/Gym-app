@@ -6,6 +6,7 @@ import { getUnit } from "@/lib/unit.server";
 import type { EditableSet } from "./EditSets";
 import { DeleteWorkoutButton } from "./DeleteWorkoutButton";
 import { WorkoutSummary, type PrevSet } from "./WorkoutSummary";
+import type { CoachTarget } from "@/lib/coach";
 
 type Row = EditableSet & { exercise: { name: string; muscle_group: string } | null };
 
@@ -16,7 +17,7 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
 
   const { data: workout } = await supabase
     .from("workouts")
-    .select("id, name, started_at, ended_at")
+    .select("id, name, routine_id, started_at, ended_at")
     .eq("id", id)
     .maybeSingle();
   if (!workout) notFound();
@@ -49,6 +50,26 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
     }));
   }
 
+  // Objetivos de la rutina de esa sesión, para los consejos de la próxima vez.
+  const targets: Record<string, CoachTarget> = {};
+  if (workout.routine_id) {
+    const { data: res } = await supabase
+      .from("routine_exercises")
+      .select("exercise_id, alt_exercise_id, rep_min, rep_max, rir_min, rir_max, rest_seconds")
+      .eq("routine_id", workout.routine_id);
+    for (const r of res ?? []) {
+      const t = {
+        repMin: r.rep_min,
+        repMax: r.rep_max,
+        rirMin: r.rir_min,
+        rirMax: r.rir_max,
+        restSeconds: r.rest_seconds,
+      };
+      targets[r.exercise_id] = t;
+      if (r.alt_exercise_id) targets[r.alt_exercise_id] = t;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <header>
@@ -70,6 +91,7 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
           unit={unit}
           minutes={workout.ended_at ? minutesBetween(workout.started_at, workout.ended_at) : null}
           prev={prev}
+          targets={targets}
           sets={rows.map(({ exercise, ...r }) => ({
             ...r,
             weight_kg: Number(r.weight_kg),
