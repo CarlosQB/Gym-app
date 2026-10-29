@@ -160,7 +160,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
           sets.filter(
             (s) =>
               (s.exercise_id === re.exercise_id || s.exercise_id === re.alt_exercise_id) &&
-              s.kind !== "warmup",
+              s.kind === "normal",
           ).length <
           re.target_sets,
       ),
@@ -194,7 +194,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
     const it = slot[subIdx] ?? slot[0];
     const id = pickEx(it, !!map[it.id]).id;
     const mine = sets.filter((s) => s.exercise_id === id);
-    const step = planOf(id, it)[mine.length];
+    // Los dropsets van pegados a una serie y no cuentan como paso del plan.
+    const step = planOf(id, it)[mine.filter((s) => s.kind !== "dropset").length];
     if (step) {
       const isWarm = step.kind === "warmup";
       return { weight: fmt(step.weight), reps: String(step.reps), rir: isWarm ? null : (it.rir_max as number | null), warmup: isWarm };
@@ -215,7 +216,10 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
   const [weight, setWeight] = useState(() => defaultsFor(initialIndex).weight);
   const [reps, setReps] = useState(() => defaultsFor(initialIndex).reps);
   const [rir, setRir] = useState<number | null>(() => defaultsFor(initialIndex).rir);
-  const [warmup, setWarmup] = useState(() => defaultsFor(initialIndex).warmup);
+  const [kindSel, setKindSel] = useState<SetKind>(() => (defaultsFor(initialIndex).warmup ? "warmup" : "normal"));
+  const warmup = kindSel === "warmup";
+  const dropset = kindSel === "dropset";
+  const setWarmup = (w: boolean) => setKindSel(w ? "warmup" : "normal");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [prFlash, setPrFlash] = useState(false);
@@ -353,9 +357,21 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
 
   const done = members.every(
     (m) =>
-      sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length >= m.re.target_sets,
+      sets.filter((s) => s.exercise_id === m.id && s.kind === "normal").length >= m.re.target_sets,
   );
   const nextNumber = exSets.length + 1;
+  // Última serie de trabajo de este ejercicio: base para el peso del dropset.
+  const lastWorkSet = [...exSets].reverse().find((s) => s.kind !== "warmup");
+
+  function chooseKind(k: SetKind) {
+    setKindSel(k);
+    if (k === "dropset" && lastWorkSet) {
+      const step = stepFor(unit);
+      const drop = Math.max(step, Math.round((toDisplay(lastWorkSet.weight_kg, unit) * 0.8) / step) * step);
+      setWeight(fmt(drop));
+      setRir(0);
+    }
+  }
 
   function onSave() {
     unlockAudio();
@@ -370,8 +386,9 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
 
     const id = crypto.randomUUID();
     const exerciseId = active!.id;
-    const kind: SetKind = warmup ? "warmup" : "normal";
+    const kind: SetKind = kindSel;
     const wasWarmup = warmup;
+    const wasDrop = dropset;
     const rir2 = wasWarmup ? null : rir;
     const rest = active!.re.rest_seconds;
     const setNoteText = note.trim() || null;
@@ -403,12 +420,12 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
       setNow(t);
     }
     let switched = false;
-    if (!wasWarmup && members.length > 1) {
+    if (!wasWarmup && !wasDrop && members.length > 1) {
       // Pasa al siguiente ejercicio del bloque que aún tenga series pendientes.
       for (let k = 1; k < members.length; k++) {
         const j = (activeSub + k) % members.length;
         const m = members[j];
-        const n = sets.filter((s) => s.exercise_id === m.id && s.kind !== "warmup").length;
+        const n = sets.filter((s) => s.exercise_id === m.id && s.kind === "normal").length;
         if (n < m.re.target_sets) {
           selectSub(j);
           switched = true;
@@ -418,7 +435,8 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
     }
     if (!switched) {
       // Mismo ejercicio: se precarga el siguiente paso del plan (si lo hay).
-      const nextStep = planOf(exerciseId, active!.re)[exSets.length + 1];
+      const stepsDone = exSets.filter((s) => s.kind !== "dropset").length + (wasDrop ? 0 : 1);
+      const nextStep = planOf(exerciseId, active!.re)[stepsDone];
       if (nextStep) {
         const isWarm = nextStep.kind === "warmup";
         setWeight(fmt(nextStep.weight));
@@ -543,7 +561,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
 
       {members.map((m, mi) => {
         const mSets = sets.filter((s) => s.exercise_id === m.id);
-        const mWork = mSets.filter((s) => s.kind !== "warmup").length;
+        const mWork = mSets.filter((s) => s.kind === "normal").length;
         const isActive = mi === activeSub;
         const pair = members.length > 1;
         return (
@@ -611,7 +629,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
               <div key={s.id} className="border-t border-line">
               <div className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center font-display text-[22px] font-semibold">
                 <span className="font-sans text-sm text-muted">
-                  {s.kind === "warmup" ? "C" : s.set_number}
+                  {s.kind === "warmup" ? "C" : s.kind === "dropset" ? "D" : s.set_number}
                 </span>
                 <span className="tabular">{fmt(toDisplay(s.weight_kg, unit))}</span>
                 <span className="tabular">{s.reps}</span>
@@ -639,7 +657,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
 
             {isActive && (
               <div className="grid h-[42px] grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center rounded-[10px] bg-accent-dim font-display text-[22px] font-bold text-accent ring-1 ring-inset ring-accent">
-                <span className="pl-2 font-sans text-sm font-semibold">{warmup ? "C" : nextNumber}</span>
+                <span className="pl-2 font-sans text-sm font-semibold">{warmup ? "C" : dropset ? "D" : nextNumber}</span>
                 <span className="tabular">{weight || "—"}</span>
                 <span className="tabular">{reps || "—"}</span>
                 <span className="tabular">{warmup ? "—" : (rir ?? "—")}</span>
@@ -701,7 +719,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
           <PlanCard
             plan={activePlan}
             last={activeLast}
-            done={exSets.length}
+            done={exSets.filter((s) => s.kind !== "dropset").length}
             unit={unit}
             onUse={(st) => {
               setWeight(fmt(st.weight));
@@ -740,16 +758,34 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-pressed={warmup}
-          onClick={() => setWarmup((v) => !v)}
-          className={`h-11 rounded-xl text-sm font-semibold ${
-            warmup ? "bg-surface-2 text-accent ring-1 ring-accent" : "bg-surface-2 text-muted"
-          }`}
-        >
-          {warmup ? "Serie de calentamiento" : "Marcar como calentamiento"}
-        </button>
+        <div role="group" aria-label="Tipo de serie" className="flex gap-1 rounded-xl bg-surface-2 p-1">
+          {(
+            [
+              { k: "normal", label: "Normal" },
+              { k: "warmup", label: "Calentamiento" },
+              { k: "dropset", label: "Dropset" },
+            ] as const
+          ).map(({ k, label }) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={kindSel === k}
+              disabled={k === "dropset" && !lastWorkSet}
+              onClick={() => chooseKind(k)}
+              className={`min-h-10 flex-1 rounded-[10px] text-[13px] font-semibold disabled:opacity-40 ${
+                kindSel === k ? "bg-accent text-bg" : "text-muted"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {dropset && (
+          <p className="text-xs text-muted">
+            Dropset: baja el peso y sigue sin descansar. Te puse ~20% menos que la serie anterior; no cuenta como serie
+            del objetivo.
+          </p>
+        )}
 
         <input
           aria-label="Nota de esta serie"
@@ -776,7 +812,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
           onClick={onSave}
           className="h-14 rounded-2xl bg-accent text-lg font-semibold text-bg disabled:opacity-60"
         >
-          {warmup ? "Guardar calentamiento" : `Guardar serie ${nextNumber}`}
+          {warmup ? "Guardar calentamiento" : dropset ? "Guardar dropset" : `Guardar serie ${nextNumber}`}
         </button>
 
         {done && index < slots.length - 1 && (
