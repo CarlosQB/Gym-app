@@ -42,7 +42,7 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
       .from("sets")
       .select("exercise_id, workout_id, kind, weight_kg, reps, rir, created_at")
       .in("exercise_id", exerciseIds)
-      .in("kind", ["normal", "warmup"])
+      .in("kind", ["normal", "warmup", "dropset"])
       .neq("workout_id", id)
       .order("created_at", { ascending: false })
       .limit(400);

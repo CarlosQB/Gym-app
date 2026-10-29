@@ -168,6 +168,63 @@ export async function updateSet(input: UpdateSetInput): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
+/** Agrega una serie a una sesión ya guardada, justo después de otra (p. ej. el dropset que faltó anotar). */
+export async function insertSetAfter(input: {
+  workoutId: string;
+  afterSetId: string;
+  kind: SetKind;
+  weightKg: number;
+  reps: number;
+  rir: number | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (
+    !["warmup", "normal", "dropset"].includes(input.kind) ||
+    !Number.isFinite(input.weightKg) ||
+    input.weightKg < 0 ||
+    !Number.isInteger(input.reps) ||
+    input.reps < 1 ||
+    (input.rir !== null && (!Number.isInteger(input.rir) || input.rir < 0 || input.rir > 10))
+  ) {
+    return { ok: false, error: "Revisa el peso y las repeticiones" };
+  }
+  const supabase = await createClient();
+  const { data: after } = await supabase
+    .from("sets")
+    .select("workout_id, exercise_id, set_number, created_at")
+    .eq("id", input.afterSetId)
+    .maybeSingle();
+  if (!after || after.workout_id !== input.workoutId) return { ok: false, error: "No se encontró la serie" };
+
+  // El orden de las series sale de created_at: la nueva queda entre esta y la siguiente.
+  const { data: next } = await supabase
+    .from("sets")
+    .select("created_at")
+    .eq("workout_id", input.workoutId)
+    .gt("created_at", after.created_at)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  const t0 = Date.parse(after.created_at);
+  const t1 = next ? Date.parse(next.created_at) : t0 + 2000;
+  const createdAt = new Date(t0 + Math.max(1, Math.floor((t1 - t0) / 2))).toISOString();
+
+  const { error } = await supabase.from("sets").insert({
+    workout_id: input.workoutId,
+    exercise_id: after.exercise_id,
+    set_number: after.set_number,
+    kind: input.kind,
+    weight_kg: input.weightKg,
+    reps: input.reps,
+    rir: input.rir,
+    is_pr: false,
+    created_at: createdAt,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/historial/${input.workoutId}`);
+  revalidatePath("/historial");
+  return { ok: true };
+}
+
 export async function updateExerciseNote(exerciseId: string, note: string) {
   const supabase = await createClient();
   await supabase
@@ -177,7 +234,6 @@ export async function updateExerciseNote(exerciseId: string, note: string) {
   revalidatePath("/", "layout");
 }
 
-/** Une dos ejercicios repetidos: series y rutinas pasan a `toId` y `fromId` se borra. */
 /** Une dos ejercicios. Con keepFromName, el que queda toma el nombre del que se borra. */
 export async function mergeExercises(
   fromId: string,

@@ -22,6 +22,7 @@ import { planFor, type PlanStep } from "@/lib/progression";
 import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
 import { TechniqueToggle } from "@/components/Technique";
 import { keepScreenOn, restFinished, unlockAudio } from "@/lib/alerts";
+import { coachTips } from "@/lib/coach";
 
 // Solo se llama desde manejadores de eventos (nunca durante el render).
 const nowMs = () => Date.now();
@@ -720,6 +721,16 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
             plan={activePlan}
             last={activeLast}
             done={exSets.filter((s) => s.kind !== "dropset").length}
+            tips={coachTips(
+              (lastSets[active.id] ?? []).map((x) => ({ kind: x.kind, weight: x.weight_kg, reps: x.reps, rir: x.rir })),
+              {
+                repMin: active.re.rep_min,
+                repMax: active.re.rep_max,
+                rirMin: active.re.rir_min,
+                rirMax: active.re.rir_max,
+                restSeconds: active.re.rest_seconds,
+              },
+            )}
             unit={unit}
             onUse={(st) => {
               setWeight(fmt(st.weight));

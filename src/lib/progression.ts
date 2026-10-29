@@ -42,7 +42,7 @@ export function planFor(opts: {
   step: number;
 }): PlanStep[] {
   const { lastSets, targetSets, repMin, repMax, rirMax, step } = opts;
-  const lastWork = lastSets.filter((s) => s.kind !== "warmup");
+  const lastWork = lastSets.filter((s) => s.kind === "normal");
   if (lastWork.length === 0) return [];
 
   // Se decide con la primera serie de trabajo: si llegó al tope del rango (o sobró RIR), todas suben de peso;

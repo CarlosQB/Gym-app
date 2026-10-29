@@ -16,12 +16,14 @@ export function PlanCard({
   last,
   done,
   unit,
+  tips,
   onUse,
 }: {
   plan: PlanStep[];
   last: { kind: string; weight: number; reps: number }[];
   done: number;
   unit: Unit;
+  tips: string[];
   onUse: (s: PlanStep) => void;
 }) {
   // Número de serie de trabajo de cada paso (los calentamientos no cuentan).
@@ -34,12 +36,13 @@ export function PlanCard({
           {last.map((s, i) => (
             <span key={i}>
               {i > 0 && " · "}
-              {s.kind === "warmup" ? "C " : ""}
+              {s.kind === "warmup" ? "C " : s.kind === "dropset" ? "D " : ""}
               {stepLabel(s, unit)}
             </span>
           ))}
         </p>
       )}
+      {tips.length > 0 && <CoachTips tips={tips} />}
       <p className="font-semibold text-accent">Hoy (recomendado · estimación)</p>
       <ol className="flex flex-col gap-1">
         {plan.map((st, i) => {
@@ -63,6 +66,20 @@ export function PlanCard({
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/** Consejos para mejorar respecto a la vez pasada. */
+export function CoachTips({ tips, title = "Consejo para hoy" }: { tips: string[]; title?: string }) {
+  return (
+    <div className="rounded-lg bg-bg/60 px-2.5 py-2">
+      <p className="text-xs font-semibold text-text">💡 {title}</p>
+      <ul className="mt-0.5 list-disc pl-4 text-xs leading-relaxed text-muted">
+        {tips.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
     </div>
   );
 }

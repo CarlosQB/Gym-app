@@ -1,5 +1,7 @@
 import { toDisplay, type Unit } from "@/lib/units";
 import { EditSets, type EditableSet } from "./EditSets";
+import { CoachTips } from "@/components/SessionExtras";
+import { coachTips, type CoachTarget } from "@/lib/coach";
 
 export type SummarySet = EditableSet & { exerciseId: string; name: string; muscle: string };
 
@@ -33,12 +35,14 @@ export function WorkoutSummary({
   workoutId,
   sets,
   prev,
+  targets,
   minutes,
   unit,
 }: {
   workoutId: string;
   sets: SummarySet[];
   prev: PrevSet[];
+  targets: Record<string, CoachTarget>;
   minutes: number | null;
   unit: Unit;
 }) {
@@ -78,7 +82,13 @@ export function WorkoutSummary({
     const normals = w.filter((s) => s.kind === "normal");
     const workIdx = all.map((s) => (s.kind === "normal" ? normals.indexOf(s) : -1));
     const trend = best && pBest ? trendOf(best.weight_kg, best.reps, pBest.weight_kg, pBest.reps) : null;
-    return { id, name: all[0].name, muscle: all[0].muscle, all, workIdx, vol, e1rm, pl, pVol, trend };
+    const tips = targets[id]
+      ? coachTips(
+          all.map((s) => ({ kind: s.kind, weight: s.weight_kg, reps: s.reps, rir: s.rir })),
+          targets[id],
+        )
+      : [];
+    return { id, name: all[0].name, muscle: all[0].muscle, all, workIdx, vol, e1rm, pl, pVol, trend, tips };
   });
 
   const byMuscle = new Map<string, number>();
@@ -224,6 +234,8 @@ export function WorkoutSummary({
             {r.pl.length > 0 && ` (${sign(r.vol - r.pVol)}${nf.format(Math.abs(d(r.vol - r.pVol)))} vs antes)`}
             {r.e1rm > 0 && ` · 1RM est. ${nf.format(d(r.e1rm))} ${unit}`}
           </p>
+
+          {r.tips.length > 0 && <CoachTips tips={r.tips} title="Para la próxima" />}
 
           <details className="group rounded-xl bg-bg">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold">
