@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { mergeExercises, updateExerciseNote } from "@/app/actions";
 import type { PlanStep } from "@/lib/progression";
+import type { ExerciseType, Tip } from "@/lib/coach";
 import type { Unit } from "@/lib/units";
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2))));
@@ -23,7 +24,7 @@ export function PlanCard({
   last: { kind: string; weight: number; reps: number }[];
   done: number;
   unit: Unit;
-  tips: string[];
+  tips: { type: ExerciseType; list: Tip[] };
   onUse: (s: PlanStep) => void;
 }) {
   // Número de serie de trabajo de cada paso (los calentamientos no cuentan).
@@ -42,7 +43,7 @@ export function PlanCard({
           ))}
         </p>
       )}
-      {tips.length > 0 && <CoachTips tips={tips} />}
+      {tips.list.length > 0 && <CoachTips tips={tips.list} type={tips.type} />}
       <p className="font-semibold text-accent">Hoy (recomendado · estimación)</p>
       <ol className="flex flex-col gap-1">
         {plan.map((st, i) => {
@@ -70,14 +71,33 @@ export function PlanCard({
   );
 }
 
-/** Consejos para mejorar respecto a la vez pasada. */
-export function CoachTips({ tips, title = "Consejo para hoy" }: { tips: string[]; title?: string }) {
+/** Consejos para mejorar respecto a la vez pasada: qué hacer y por qué, según el tipo de ejercicio. */
+export function CoachTips({
+  tips,
+  type,
+  title = "Consejo para hoy",
+}: {
+  tips: Tip[];
+  type: ExerciseType;
+  title?: string;
+}) {
   return (
     <div className="rounded-lg bg-bg/60 px-2.5 py-2">
-      <p className="text-xs font-semibold text-text">💡 {title}</p>
-      <ul className="mt-0.5 list-disc pl-4 text-xs leading-relaxed text-muted">
+      <p className="flex items-center justify-between gap-2 text-xs font-semibold text-text">
+        <span>💡 {title}</span>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+          {type === "compuesto" ? "Compuesto" : "Aislado"}
+        </span>
+      </p>
+      <ul className="mt-1 flex flex-col gap-1.5">
         {tips.map((t) => (
-          <li key={t}>{t}</li>
+          <li key={t.title} className="text-xs leading-snug">
+            <span className="text-text">{t.title}</span>
+            <details className="text-muted">
+              <summary className="cursor-pointer list-none text-[11px] underline">¿Por qué?</summary>
+              {t.why}
+            </details>
+          </li>
         ))}
       </ul>
     </div>

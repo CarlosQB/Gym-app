@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, formatDayMonth, localYmd, minutesBetween, streakWeeks } from "@/lib/dates";
+import { getUnit } from "@/lib/unit.server";
+import { toDisplay } from "@/lib/units";
+import { formatMinutes, RowBars, StatTile } from "@/components/Stats";
 
 const DAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 type W = { id: string; name: string; started_at: string; ended_at: string | null };
+type S = { workout_id: string; kind: string; weight_kg: number; reps: number; exercise: { muscle_group: string } | null };
+
+const nf = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 0 });
+const n1 = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 });
+const mins = (ws: W[]) => ws.reduce((a, w) => a + (w.ended_at ? minutesBetween(w.started_at, w.ended_at) : 0), 0);
 
 function shiftMonth(y: number, m: number, d: number) {
   const t = new Date(Date.UTC(y, m - 1 + d, 1));
@@ -28,7 +36,9 @@ export default async function CalendarioPage(props: PageProps<"/calendario">) {
   const offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // lunes = 0
 
   const supabase = await createClient();
-  const from = new Date(`${addDays(first, -1)}T00:00:00Z`).toISOString();
+  const unit = await getUnit();
+  const prevMonth = shiftMonth(y, m, -1);
+  const from = new Date(`${addDays(`${prevMonth}-01`, -1)}T00:00:00Z`).toISOString();
   const to = new Date(`${addDays(first, daysInMonth + 1)}T00:00:00Z`).toISOString();
   const since = new Date(`${addDays(today, -400)}T00:00:00Z`).toISOString();
 
@@ -37,7 +47,39 @@ export default async function CalendarioPage(props: PageProps<"/calendario">) {
     supabase.from("workouts").select("started_at").not("ended_at", "is", null).gte("started_at", since),
   ]);
 
-  const inMonth = ((monthRes.data ?? []) as W[]).filter((w) => localYmd(new Date(w.started_at)).startsWith(first.slice(0, 7)));
+  const all = (monthRes.data ?? []) as W[];
+  const inMonth = all.filter((w) => localYmd(new Date(w.started_at)).startsWith(first.slice(0, 7)));
+  const inPrev = all.filter((w) => localYmd(new Date(w.started_at)).startsWith(prevMonth));
+
+  // Series del mes: volumen y reparto por músculo.
+  const { data: sData } = inMonth.length
+    ? await supabase
+        .from("sets")
+        .select("workout_id, kind, weight_kg, reps, exercise:exercises(muscle_group)")
+        .in(
+          "workout_id",
+          inMonth.map((w) => w.id),
+        )
+        .limit(5000)
+    : { data: [] };
+  const sets = (sData ?? []) as unknown as S[];
+  const workSets = sets.filter((x) => x.kind === "normal");
+  const volume = sets.filter((x) => x.kind !== "warmup").reduce((a, x) => a + Number(x.weight_kg) * x.reps, 0);
+  const byMuscle = new Map<string, number>();
+  for (const x of workSets) {
+    const g = x.exercise?.muscle_group ?? "Otro";
+    byMuscle.set(g, (byMuscle.get(g) ?? 0) + 1);
+  }
+  const muscles = [...byMuscle.entries()].sort((a, b) => b[1] - a[1]);
+  const routines = new Map<string, number>();
+  for (const w of inMonth) routines.set(w.name, (routines.get(w.name) ?? 0) + 1);
+  const topRoutines = [...routines.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  const minutes = mins(inMonth);
+  const finished = inMonth.filter((w) => w.ended_at).length;
+  const isCurrent = first.slice(0, 7) === today.slice(0, 7);
+  const daysSoFar = isCurrent ? Number(today.slice(8)) : daysInMonth;
+  const perWeek = (inMonth.length / daysSoFar) * 7;
   const byDay = new Map<number, W[]>();
   for (const w of inMonth) {
     const d = Number(localYmd(new Date(w.started_at)).slice(8));
@@ -81,16 +123,23 @@ export default async function CalendarioPage(props: PageProps<"/calendario">) {
             </span>
           ))}
           {cells.map((d, i) => {
-            if (d === null) return <div key={i} className="h-11" />;
+            if (d === null) return <div key={i} className="h-12" />;
             const ymd = `${first.slice(0, 8)}${String(d).padStart(2, "0")}`;
             const ws = byDay.get(d);
             const isToday = ymd === today;
-            const cls = `flex h-11 items-center justify-center rounded-xl font-display text-xl font-bold ${
+            const dayMin = ws ? mins(ws) : 0;
+            const cls = `flex h-12 flex-col items-center justify-center rounded-xl font-display text-xl font-bold leading-none ${
               ws ? "bg-accent text-bg" : isToday ? "border-2 border-accent text-accent" : "text-muted"
             }`;
             return ws ? (
-              <Link key={i} href={`/historial/${ws[0].id}`} className={cls} aria-label={`Sesión del día ${d}`}>
+              <Link
+                key={i}
+                href={`/historial/${ws[0].id}`}
+                className={cls}
+                aria-label={`Día ${d}: ${ws[0].name}${dayMin ? `, ${dayMin} minutos` : ""}`}
+              >
                 {d}
+                {dayMin > 0 && <span className="mt-0.5 font-sans text-[10px] font-semibold">{dayMin}′</span>}
               </Link>
             ) : (
               <div key={i} className={cls}>
@@ -99,6 +148,46 @@ export default async function CalendarioPage(props: PageProps<"/calendario">) {
             );
           })}
         </div>
+      </section>
+
+      <section aria-labelledby="mes" className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
+        <h2 id="mes" className="font-display text-2xl font-bold">
+          Tu {MONTHS[m - 1].toLowerCase()}
+        </h2>
+        <dl className="grid grid-cols-2 gap-2">
+          <StatTile
+            label="Tiempo entrenado"
+            value={formatMinutes(minutes)}
+            delta={minutes - mins(inPrev)}
+            deltaLabel={formatMinutes(Math.abs(minutes - mins(inPrev)))}
+          />
+          <StatTile label="Sesiones" value={String(inMonth.length)} delta={inMonth.length - inPrev.length} />
+          <StatTile
+            label="Promedio por sesión"
+            value={finished ? formatMinutes(minutes / finished) : "—"}
+            hint={`${n1.format(perWeek)} días por semana`}
+          />
+          <StatTile
+            label={`Volumen (${unit})`}
+            value={nf.format(toDisplay(volume, unit))}
+            hint={`${workSets.length} series de trabajo`}
+          />
+        </dl>
+        {muscles.length > 0 && (
+          <div>
+            <h3 className="mb-1.5 text-sm font-semibold">Series por músculo</h3>
+            <RowBars data={muscles.map(([label, value]) => ({ label, value }))} />
+          </div>
+        )}
+        {topRoutines.length > 0 && (
+          <div>
+            <h3 className="mb-1 text-sm font-semibold">Rutinas que más hiciste</h3>
+            <p className="text-sm text-muted">
+              {topRoutines.map(([name, n]) => `${name} (${n})`).join(" · ")}
+            </p>
+          </div>
+        )}
+        <p className="text-xs text-muted">Comparado contra {MONTHS[(m + 10) % 12].toLowerCase()}. El volumen no cuenta calentamientos.</p>
       </section>
 
       <section className="rounded-2xl bg-surface p-4">
