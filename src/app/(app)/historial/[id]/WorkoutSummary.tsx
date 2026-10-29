@@ -75,7 +75,8 @@ export function WorkoutSummary({
       null,
     );
     // Número de serie de trabajo (los calentamientos no cuentan) para comparar contra la misma serie de antes.
-    const workIdx = all.map((s) => (s.kind === "warmup" ? -1 : w.indexOf(s)));
+    const normals = w.filter((s) => s.kind === "normal");
+    const workIdx = all.map((s) => (s.kind === "normal" ? normals.indexOf(s) : -1));
     const trend = best && pBest ? trendOf(best.weight_kg, best.reps, pBest.weight_kg, pBest.reps) : null;
     return { id, name: all[0].name, muscle: all[0].muscle, all, workIdx, vol, e1rm, pl, pVol, trend };
   });
@@ -95,8 +96,15 @@ export function WorkoutSummary({
           <Tile label="Duración" value={minutes ? `${minutes} min` : "—"} hint={minutes ? undefined : "Sin terminar"} />
           <Tile
             label="Series de trabajo"
-            value={String(work.length)}
-            hint={sets.length > work.length ? `+ ${sets.length - work.length} de calentamiento` : undefined}
+            value={String(normal.length)}
+            hint={
+              [
+                work.length > normal.length ? `+ ${work.length - normal.length} dropset` : "",
+                sets.length > work.length ? `+ ${sets.length - work.length} calent.` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
           />
           <Tile label={`Volumen (${unit})`} value={nf.format(d(volume))} />
           <Tile
@@ -173,8 +181,13 @@ export function WorkoutSummary({
                 return (
                   <tr key={s.id} className={`border-t border-line ${warm ? "text-muted" : ""}`}>
                     <th scope="row" className="py-2 font-normal text-muted">
-                      {warm ? <abbr title="Calentamiento">C</abbr> : idx + 1}
-                      {s.kind === "dropset" && <abbr title="Dropset"> D</abbr>}
+                      {warm ? (
+                        <abbr title="Calentamiento">C</abbr>
+                      ) : s.kind === "dropset" ? (
+                        <abbr title="Dropset">D</abbr>
+                      ) : (
+                        idx + 1
+                      )}
                     </th>
                     <td className="py-2 font-display text-lg font-bold">
                       {n1.format(d(s.weight_kg))} <span className="text-xs font-normal text-muted">{unit}</span>
@@ -228,7 +241,7 @@ export function WorkoutSummary({
 
       <p className="text-xs text-muted">
         ▲ mejor que la vez pasada (más peso, o mismo peso con más reps) · ▼ menos · ★ récord. C = calentamiento, no
-        cuenta en series ni volumen. 1RM y series efectivas son estimaciones.
+        cuenta en series ni volumen. D = dropset, suma volumen pero no cuenta como serie. 1RM y series efectivas son estimaciones.
       </p>
     </div>
   );
