@@ -51,11 +51,11 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
   }
 
   // Objetivos de la rutina de esa sesión, para los consejos de la próxima vez.
-  const targets: Record<string, CoachTarget> = {};
+  const targets: Record<string, CoachTarget & { position: number }> = {};
   if (workout.routine_id) {
     const { data: res } = await supabase
       .from("routine_exercises")
-      .select("exercise_id, alt_exercise_id, rep_min, rep_max, rir_min, rir_max, rest_seconds")
+      .select("exercise_id, alt_exercise_id, position, rep_min, rep_max, rir_min, rir_max, rest_seconds")
       .eq("routine_id", workout.routine_id);
     for (const r of res ?? []) {
       const t = {
@@ -64,6 +64,7 @@ export default async function HistorialDetallePage(props: PageProps<"/historial/
         rirMin: r.rir_min,
         rirMax: r.rir_max,
         restSeconds: r.rest_seconds,
+        position: r.position,
       };
       targets[r.exercise_id] = t;
       if (r.alt_exercise_id) targets[r.alt_exercise_id] = t;
