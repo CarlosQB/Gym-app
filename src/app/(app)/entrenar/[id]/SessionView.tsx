@@ -17,7 +17,7 @@ import {
 } from "@/lib/offline";
 import { FAILED_EVENT, SAVED_EVENT, flushQueue } from "@/lib/sync";
 import type { LastBest, LastSetRow, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
-import { defaultWeight, fromDisplay, stepFor, toDisplay, type Unit } from "@/lib/units";
+import { defaultWeight, fromDisplay, progressStep, stepFor, toDisplay, type Unit } from "@/lib/units";
 import { planFor, type PlanStep } from "@/lib/progression";
 import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
 import { TechniqueToggle } from "@/components/Technique";
@@ -184,7 +184,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
       repMin: it.rep_min,
       repMax: it.rep_max,
       rirMax: it.rir_max,
-      step: stepFor(unit),
+      step: progressStep(unit, it.alt_exercise?.id === exerciseId ? it.alt_exercise.name : it.exercise.name),
     });
   }
 
@@ -367,7 +367,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
   function chooseKind(k: SetKind) {
     setKindSel(k);
     if (k === "dropset" && lastWorkSet) {
-      const step = stepFor(unit);
+      const step = progressStep(unit, active?.ex.name);
       const drop = Math.max(step, Math.round((toDisplay(lastWorkSet.weight_kg, unit) * 0.8) / step) * step);
       setWeight(fmt(drop));
       setRir(0);
