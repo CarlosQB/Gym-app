@@ -166,7 +166,7 @@ export function NoHistoryChip({
 }
 
 const PLATES: Record<Unit, number[]> = {
-  lb: [45, 35, 25, 10, 5, 2.5],
+  lb: [45, 35, 25, 10, 5], // en el gym no hay discos de menos de 5 lb
   kg: [25, 20, 15, 10, 5, 2.5, 1.25],
 };
 const BARS: Record<Unit, number[]> = { lb: [45, 35, 15], kg: [20, 15, 10] };
