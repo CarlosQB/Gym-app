@@ -295,3 +295,27 @@ export function ExerciseNote({ exerciseId, initial }: { exerciseId: string; init
     />
   );
 }
+
+/** Notas que dejaste en las series de la vez pasada de este ejercicio. */
+export function LastNotes({ rows }: { rows: { kind: string; note?: string | null }[] }) {
+  const notes = rows
+    .map((r, i) => {
+      const num = rows.slice(0, i + 1).filter((x) => x.kind === "normal").length;
+      const tag = r.kind === "warmup" ? "C" : r.kind === "dropset" ? "D" : String(num);
+      return { tag, note: r.note?.trim() };
+    })
+    .filter((x): x is { tag: string; note: string } => !!x.note);
+  if (notes.length === 0) return null;
+  return (
+    <div className="mb-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
+      <p className="text-xs font-semibold text-muted">Notas de la vez pasada</p>
+      <ul className="mt-0.5 flex flex-col gap-0.5">
+        {notes.map((x, i) => (
+          <li key={i}>
+            <span className="tabular text-muted">Serie {x.tag}:</span> {x.note}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

@@ -19,7 +19,7 @@ import { FAILED_EVENT, SAVED_EVENT, flushQueue } from "@/lib/sync";
 import type { LastBest, LastSetRow, RoutineExercise, SetKind, SetRow, Workout } from "@/lib/types";
 import { defaultWeight, fromDisplay, progressStep, stepFor, toDisplay, type Unit } from "@/lib/units";
 import { planFor, type PlanStep } from "@/lib/progression";
-import { ExerciseNote, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
+import { ExerciseNote, LastNotes, NoHistoryChip, PlanCard, PlateCalc } from "@/components/SessionExtras";
 import { TechniqueToggle } from "@/components/Technique";
 import { keepScreenOn, restFinished, unlockAudio } from "@/lib/alerts";
 import { coachTips, exerciseType } from "@/lib/coach";
@@ -617,6 +617,7 @@ export function SessionView({ workout, items, sets: serverSets, lastBest, lastSe
 
             <TechniqueToggle key={`t-${m.id}`} exerciseId={m.id} imageId={m.ex.image_id} name={m.ex.name} />
             <ExerciseNote key={m.id} exerciseId={m.id} initial={m.ex.notes ?? null} />
+            <LastNotes rows={lastSets[m.id] ?? []} />
 
             <div className="grid h-6 grid-cols-[44px_repeat(3,minmax(0,1fr))_40px] items-center text-xs font-medium tracking-[0.06em] text-muted">
               <span>SERIE</span>
