@@ -40,7 +40,7 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
   if (exerciseIds.length > 0) {
     const { data: prev } = await supabase
       .from("sets")
-      .select("exercise_id, workout_id, kind, weight_kg, reps, rir, created_at")
+      .select("exercise_id, workout_id, kind, weight_kg, reps, rir, note, created_at")
       .in("exercise_id", exerciseIds)
       .in("kind", ["normal", "warmup", "dropset"])
       .neq("workout_id", id)
@@ -53,7 +53,13 @@ export default async function SesionPage(props: PageProps<"/entrenar/[id]">) {
     }
     for (const s of [...(prev ?? [])].reverse()) {
       if (s.workout_id !== latestWorkout[s.exercise_id]) continue;
-      (lastSets[s.exercise_id] ??= []).push({ kind: s.kind, weight_kg: Number(s.weight_kg), reps: s.reps, rir: s.rir });
+      (lastSets[s.exercise_id] ??= []).push({
+        kind: s.kind,
+        weight_kg: Number(s.weight_kg),
+        reps: s.reps,
+        rir: s.rir,
+        note: s.note,
+      });
     }
     for (const s of prev ?? []) {
       if (s.workout_id !== latestWorkout[s.exercise_id] || s.kind !== "normal") continue;

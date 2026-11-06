@@ -56,4 +56,4 @@ export type SetRow = {
 };
 
 export type LastBest = { weight_kg: number; reps: number; rir: number | null };
-export type LastSetRow = { kind: string; weight_kg: number; reps: number; rir: number | null };
+export type LastSetRow = { kind: string; weight_kg: number; reps: number; rir: number | null; note?: string | null };
